@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner LJK - Pure Scale Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .checkerboard { background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%, transparent 75%, #1e293b 75%, #1e293b), linear-gradient(45deg, #1e293b 25%, transparent 25%, transparent 75%, #1e293b 75%, #1e293b); background-size: 20px 20px; background-position: 0 0, 10px 10px; }
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow: hidden; }
+        #video-container { position: relative; width: 100%; height: 100%; min-height: 500px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 0.5rem; }
+        #video, #overlay-canvas, #result-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        #result-canvas { z-index: 40; }
+        #overlay-canvas { z-index: 30; }
+        #video { z-index: 20; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+<div class="max-w-7xl mx-auto p-4 md:p-6">
+    <header class="bg-slate-900 text-white rounded-xl p-6 shadow-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b-4 border-emerald-500">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-emerald-400">LJK Scanner</h1>
+            <p class="text-sm text-slate-300 mt-1">Sistem Pindai OMR Profesional & Threshold Relatif</p>
+        </div>
+        <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700">
+            <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV Memuat...
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
+            <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
+                <span>Parameter</span>
+                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">LJK A4</span>
+            </h2>
+            <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-24 overflow-y-auto shadow-inner" id="ai-log">
+                > Sistem OMR ringan siap beroperasi...<br>
+            </div>
+            <div>
+                <label id="lbl-answer-key" class="block text-xs font-bold mb-2 text-slate-700 uppercase">Kunci Jawaban (N)</label>
+                <textarea id="answer-key" rows="4" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 uppercase tracking-widest font-mono font-bold text-emerald-700 resize-none leading-relaxed" placeholder="Contoh Pengisian Kunci:&#10;ABCDABCDABCDABCD..."></textarea>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col relative">
+            <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 flex justify-between items-center text-slate-800">
+                <span>Layar Tracking & Pratinjau</span>
+                <span id="scan-status" class="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-500 rounded-full border border-slate-200">Menunggu Aksi...</span>
+            </h2>
+            <div id="video-container" class="relative w-full bg-[#0f172a] rounded-lg overflow-hidden flex-1 min-h-[500px] flex items-center justify-center checkerboard">
+                <div id="placeholder-text" class="text-slate-400 text-sm font-medium text-center px-4 leading-relaxed absolute z-0">
+                    <svg class="w-16 h-16 mx-auto mb-3 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"></path></svg>
+                    Arahkan kamera ke Bingkai Terluar LJK.
+                </div>
+                <video id="video" playsinline autoplay muted class="hidden"></video>
+                <canvas id="overlay-canvas" class="hidden pointer-events-none"></canvas>
+                <canvas id="result-canvas" class="hidden"></canvas>
+                <div id="loader-overlay" class="absolute inset-0 bg-slate-900/90 hidden flex-col justify-center items-center z-50 backdrop-blur-sm">
+                    <div class="loader mb-4"></div>
+                    <p id="loader-text" class="text-sm font-bold text-emerald-400 tracking-widest animate-pulse uppercase">Memproses Arsiran...</p>
+                </div>
+            </div>
+            <canvas id="hidden-canvas" class="hidden"></canvas>
+
+            <div class="flex flex-row gap-4 mt-5">
+                <button id="btn-camera" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-bold transition shadow-md flex justify-center items-center gap-2 text-sm sm:text-base">
+                    <svg class="w-5 h-5 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Buka Kamera
+                </button>
+                <label class="flex-1 bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-lg font-bold text-center cursor-pointer transition shadow-md flex justify-center items-center gap-2 text-sm sm:text-base">
+                    <svg class="w-5 h-5 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Upload Foto LJK
+                    <input type="file" id="file-upload" accept="image/*" class="hidden">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabel Hasil -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-4 gap-4">
+            <h2 class="font-bold text-xl text-slate-800">Rekapitulasi Nilai</h2>
+            <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
+                Download Excel
+            </button>
+        </div>
+        <div class="overflow-x-auto rounded-lg border border-slate-200">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-600">
+                        <th class="p-4 font-bold">No</th>
+                        <th class="p-4 font-bold text-slate-900">Nama Siswa</th>
+                        <th class="p-4 font-bold">Kls</th>
+                        <th class="p-4 font-bold">No</th>
+                        <th class="p-4 font-bold text-emerald-500">Benar</th>
+                        <th class="p-4 font-bold text-red-500">Salah</th>
+                        <th class="p-4 font-bold text-slate-500">Kosong</th>
+                        <th class="p-4 font-bold text-emerald-600">No. Benar</th>
+                        <th class="p-4 font-bold text-red-600">No. Salah</th>
+                    </tr>
+                </thead>
+                <tbody id="result-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Pop Up -->
+<div id="result-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[100]">
+    <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-75"></div>
+    <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 transform scale-95 transition-transform duration-300">
+        <div class="modal-content py-4 text-left px-6">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+                <p class="text-xl font-bold text-emerald-600">Berhasil Dipindai!</p>
+                <div class="modal-close cursor-pointer z-50" onclick="closeModal()">
+                    <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                </div>
+            </div>
+            <div class="my-5 text-center">
+                <p class="text-xs text-slate-500 mb-1">Nama Lengkap</p>
+                <h3 id="modal-name" class="text-lg font-black text-slate-800 mb-4 uppercase">-</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <p class="text-[10px] text-slate-500">Kelas / No. Absen</p>
+                        <p id="modal-kelas-absen" class="text-md font-bold text-slate-800">-</p>
+                    </div>
+                    <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                        <p class="text-[10px] text-emerald-600">Jawaban Benar</p>
+                        <p id="modal-benar" class="text-xl font-black text-emerald-600">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeModal()" class="px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 w-full text-center">Tutup & Lanjut</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const FRAME_W_GRIDS = 42.0, FRAME_H_GRIDS = 59.0;
+    const WARP_W = 1260, WARP_H = 1770; 
+    const STROKE_THICKNESS = 8; 
+    const MARGIN_LEFT_GRIDS = 2.0, MARGIN_TOP_GRIDS = 4.0;
+    const GRID_COLS = 38, GRID_ROWS = 53;
+    const MATRIX_MAP = {
+        name: { c: 0, r: 0, w: 20, h: 26, skipRow: 2 }, 
+        kelas: { c: 21, r: 14, w: 2, h: 12, skipRow: 2 }, 
+        absen: { c: 24, r: 16, w: 3, h: 10, skipRow: 2 }, 
+        answers: { startRow: 29, skipRow: 1, qPerCol: 10, options: 4, blocks: [ { startCol: 0 }, { startCol: 5 }, { startCol: 10 }, { startCol: 15 }, { startCol: 20 } ], optionOffset: 1 }
+    };
+    const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+    const NUMBERS = "0123456789".split('');
+    const KELAS_VALS = ['7','8','9','A','B','C','D','E','F','G','H','T'];
+
+    let resultData = [], scanCounter = 1, globalWarpedMat = null, smoothedMarkers = null, videoScanLoop = null, autoCaptureLockCount = 0;
+    const AUTO_CAPTURE_THRESHOLD = 15; 
+
+    const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas'), hiddenCanvas = document.getElementById('hidden-canvas'), resultCanvas = document.getElementById('result-canvas'), scanStatus = document.getElementById('scan-status'), answerKeyInput = document.getElementById('answer-key'), lblAnswerKey = document.getElementById('lbl-answer-key');
+    
+    function updateAnswerKeyLabel() {
+        if (!answerKeyInput || !lblAnswerKey) return;
+        const charCount = answerKeyInput.value.replace(/[^A-D]/gi, '').length;
+        lblAnswerKey.innerText = charCount > 0 ? `Kunci Jawaban (${charCount})` : `Kunci Jawaban (N)`;
+    }
+    
+    if (answerKeyInput) answerKeyInput.addEventListener('input', updateAnswerKeyLabel);
+
+    function validateKey() {
+        const key = answerKeyInput.value.replace(/[^A-D]/gi, '');
+        if (!key || key.length === 0) {
+            alert("Halo Bapak/Ibu, Kunci Jawaban masih kosong.\n\nMohon isi terlebih dahulu kotak Kunci Jawaban (misalnya: ABCDABCD...) sebelum memindai atau mengunggah LJK.\n\nSilakan ketik kuncinya pada kolom yang tersedia.");
+            answerKeyInput.focus();
+            return false;
+        }
+        return true;
+    }
+
+    function logAI(msg) {
+        const logBox = document.getElementById('ai-log');
+        if (logBox) { logBox.innerHTML += `> ${msg}<br>`; logBox.scrollTop = logBox.scrollHeight; }
+    }
+
+    function resetUI() {
+        if (videoScanLoop) { cancelAnimationFrame(videoScanLoop); videoScanLoop = null; }
+        if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+        resultCanvas.classList.add('hidden'); resultCanvas.style.display = 'none';
+        overlayCanvas.getContext('2d').clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        video.classList.add('hidden'); overlayCanvas.classList.add('hidden'); document.getElementById('placeholder-text').classList.add('hidden');
+        smoothedMarkers = null; autoCaptureLockCount = 0; scanStatus.innerText = "Kamera Nonaktif";
+    }
+
+    const checkCV = setInterval(() => {
+        if (typeof cv !== 'undefined' && cv.Mat) {
+            clearInterval(checkCV);
+            document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> OpenCV Siap';
+        }
+    }, 500);
+
+    document.getElementById('btn-camera').addEventListener('click', async () => {
+        if (!validateKey()) return; 
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { 
+            alert("Kamera tidak tersedia. Jika Anda menggunakan browser dalam aplikasi seperti WhatsApp, mohon buka tautan ini melalui browser utama (Chrome/Safari)."); 
+            return; 
+        }
+        resetUI(); video.classList.remove('hidden'); overlayCanvas.classList.remove('hidden');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                video.play().then(() => {
+                    let scale = Math.min(480 / Math.max(video.videoWidth, video.videoHeight), 1.0);
+                    hiddenCanvas.width = video.videoWidth * scale; hiddenCanvas.height = video.videoHeight * scale;
+                    overlayCanvas.width = hiddenCanvas.width; overlayCanvas.height = hiddenCanvas.height;
+                    startStreamLoop();
+                });
+            };
+        } catch (e) { alert("Akses kamera ditolak. Pastikan izin kamera telah diberikan."); }
+    });
+
+    document.getElementById('file-upload').addEventListener('change', (e) => {
+        if (!validateKey()) { e.target.value = ''; return; }
+        const file = e.target.files[0]; if (!file) return;
+        resetUI();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                let scale = Math.min(1800 / Math.max(img.width, img.height), 1.0);
+                hiddenCanvas.width = img.width * scale; hiddenCanvas.height = img.height * scale;
+                hiddenCanvas.getContext('2d').drawImage(img, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                document.getElementById('loader-overlay').classList.remove('hidden');
+                setTimeout(() => processLJKBase(hiddenCanvas), 100);
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function findOuterFrame(src) {
+        if (!src || src.empty()) return null;
+        let gray = new cv.Mat(), blur = new cv.Mat(), thresh = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+        cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+        cv.adaptiveThreshold(blur, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 21, 5);
+        
+        let cnts = new cv.MatVector(), hi = new cv.Mat(), maxArea = 0, bestApprox = null;
+        cv.findContours(thresh, cnts, hi, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+        for (let i = 0; i < cnts.size(); ++i) {
+            let c = cnts.get(i), area = cv.contourArea(c);
+            if (area > (src.cols * src.rows * 0.10)) {
+                let approx = new cv.Mat();
+                cv.approxPolyDP(c, approx, 0.02 * cv.arcLength(c, true), true);
+                if (approx.rows === 4 && area > maxArea) {
+                    maxArea = area;
+                    if (bestApprox) bestApprox.delete();
+                    bestApprox = approx.clone();
+                }
+                approx.delete();
+            }
+        }
+        
+        let result = null;
+        if (bestApprox) {
+            let pts = [];
+            for (let i = 0; i < 4; i++) pts.push({ x: bestApprox.data32S[i * 2], y: bestApprox.data32S[i * 2 + 1] });
+            bestApprox.delete();
+            pts.sort((a, b) => a.y - b.y);
+            let top = pts.slice(0, 2).sort((a, b) => a.x - b.x), bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+            result = { tl: top[0], tr: top[1], br: bottom[1], bl: bottom[0] };
+        }
+        gray.delete(); blur.delete(); thresh.delete(); cnts.delete(); hi.delete();
+        return result;
+    }
+
+    function startStreamLoop() {
+        if (videoScanLoop) cancelAnimationFrame(videoScanLoop);
+        function loop() {
+            if (!video.paused && !video.ended) {
+                if (video.videoWidth === 0) { videoScanLoop = requestAnimationFrame(loop); return; }
+                try {
+                    hiddenCanvas.getContext('2d').drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+                    let mat = cv.imread(hiddenCanvas), frame = findOuterFrame(mat), ctx = overlayCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+                    if (frame) {
+                        if (!smoothedMarkers) { smoothedMarkers = frame; autoCaptureLockCount = 0; } 
+                        else {
+                            ['tl', 'tr', 'br', 'bl'].forEach(k => {
+                                smoothedMarkers[k].x = smoothedMarkers[k].x * 0.7 + frame[k].x * 0.3;
+                                smoothedMarkers[k].y = smoothedMarkers[k].y * 0.7 + frame[k].y * 0.3;
+                            });
+                            autoCaptureLockCount++;
+                        }
+                        ctx.lineWidth = 4; ctx.strokeStyle = "#10b981"; ctx.beginPath(); 
+                        ctx.moveTo(smoothedMarkers.tl.x, smoothedMarkers.tl.y); ctx.lineTo(smoothedMarkers.tr.x, smoothedMarkers.tr.y); 
+                        ctx.lineTo(smoothedMarkers.br.x, smoothedMarkers.br.y); ctx.lineTo(smoothedMarkers.bl.x, smoothedMarkers.bl.y); 
+                        ctx.closePath(); ctx.stroke();
+                        scanStatus.innerHTML = `<span class='text-emerald-500 font-bold'>LOCKING... (${Math.min(100, Math.round((autoCaptureLockCount/AUTO_CAPTURE_THRESHOLD)*100))}%)</span>`;
+                        
+                        if (autoCaptureLockCount >= AUTO_CAPTURE_THRESHOLD) {
+                            cancelAnimationFrame(videoScanLoop); mat.delete(); executeCapture(); return; 
+                        }
+                    } else {
+                        autoCaptureLockCount = 0; scanStatus.innerText = "Arahkan Kamera ke Bingkai Terluar LJK...";
+                    }
+                    mat.delete();
+                } catch (err) {}
+                videoScanLoop = requestAnimationFrame(loop);
+            }
+        }
+        loop();
+    }
+
+    function executeCapture() {
+        let captureCanvas = document.createElement('canvas');
+        captureCanvas.width = video.videoWidth; captureCanvas.height = video.videoHeight;
+        captureCanvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        resetUI();
+        document.getElementById('loader-overlay').classList.remove('hidden');
+        setTimeout(() => processLJKBase(captureCanvas), 200);
+    }
+
+    function processLJKBase(canvas) {
+        let src = null;
+        try {
+            src = cv.imread(canvas);
+            let f = findOuterFrame(src);
+            if (!f) throw new Error("Gagal mengunci bingkai LJK. Pastikan kertas utuh & terang.");
+
+            if (globalWarpedMat) globalWarpedMat.delete();
+            globalWarpedMat = new cv.Mat.zeros(WARP_H, WARP_W, cv.CV_8UC4);
+
+            let srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, [f.tl.x, f.tl.y, f.tr.x, f.tr.y, f.br.x, f.br.y, f.bl.x, f.bl.y]);
+            let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, WARP_W, 0, WARP_W, WARP_H, 0, WARP_H]);
+            let M = cv.getPerspectiveTransform(srcPts, dstPts);
+            cv.warpPerspective(src, globalWarpedMat, M, new cv.Size(WARP_W, WARP_H), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255,255,255,255));
+            srcPts.delete(); dstPts.delete(); M.delete();
+            
+            resultCanvas.width = WARP_W; resultCanvas.height = WARP_H;
+            resultCanvas.style.display = 'block'; resultCanvas.classList.remove('hidden');
+            applyGridMatrix(true); 
+        } catch (err) {
+            alert("GAGAL: " + err.message);
+            document.getElementById('placeholder-text').classList.remove('hidden');
+            document.getElementById('loader-overlay').classList.add('hidden');
+            resetUI();
+        } finally { if(src) src.delete(); }
+    }
+
+    function applyGridMatrix(isNewScan = false) {
+        if(!globalWarpedMat) return;
+        cv.imshow('result-canvas', globalWarpedMat);
+        let ctx = resultCanvas.getContext('2d');
+
+        let innerW = WARP_W - (STROKE_THICKNESS * 2);
+        let innerH = WARP_H - (STROKE_THICKNESS * 2);
+        
+        let stepX = (innerW / FRAME_W_GRIDS) - 0.05;
+        let stepY = (innerH / FRAME_H_GRIDS) - 0.05;
+        let offsetX = 1.7;
+        let offsetY = 2.1;
+
+        let startX = STROKE_THICKNESS + (MARGIN_LEFT_GRIDS * stepX) + offsetX;
+        let startY = STROKE_THICKNESS + (MARGIN_TOP_GRIDS * stepY) + offsetY;
+        let matrixW = GRID_COLS * stepX;
+        let matrixH = GRID_ROWS * stepY;
+        
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.4)"; ctx.lineWidth = 2; ctx.strokeRect(startX, startY, matrixW, matrixH);
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.2)"; ctx.lineWidth = 1;
+        for(let r = 0; r <= GRID_ROWS; r++) { ctx.beginPath(); ctx.moveTo(startX, startY + r * stepY); ctx.lineTo(startX + matrixW, startY + r * stepY); ctx.stroke(); }
+        for(let c = 0; c <= GRID_COLS; c++) { ctx.beginPath(); ctx.moveTo(startX + c * stepX, startY); ctx.lineTo(startX + c * stepX, startY + matrixH); ctx.stroke(); }
+
+        let gray = new cv.Mat(), thresh = new cv.Mat();
+        cv.cvtColor(globalWarpedMat, gray, cv.COLOR_RGBA2GRAY, 0);
+        cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 22);
+
+        let M_kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
+        cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, M_kernel);
+        M_kernel.delete();
+
+        let gridData = [];
+        for(let r=0; r<GRID_ROWS; r++) {
+            gridData[r] = [];
+            for(let c=0; c<GRID_COLS; c++) {
+                let cx = startX + (c * stepX) + (stepX / 2), cy = startY + (r * stepY) + (stepY / 2);
+                let coreSize = Math.floor(stepX * 0.45); 
+                let rect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
+                let roi = thresh.roi(rect);
+                gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy };
+                roi.delete();
+            }
+        }
+
+        let name = extract(gridData, MATRIX_MAP.name, ALPHABET, ctx);
+        let kelas = extract(gridData, MATRIX_MAP.kelas, KELAS_VALS, ctx);
+        let absen = extract(gridData, MATRIX_MAP.absen, NUMBERS, ctx);
+        const answerKey = document.getElementById('answer-key').value.toUpperCase().replace(/[^A-D]/g, '');
+        let scoreData = grade(gridData, ctx, answerKey);
+
+        if(isNewScan) {
+            let dataRow = { id: scanCounter++, name, kelas, absen, ...scoreData };
+            resultData.push(dataRow); 
+            showPopupResult(dataRow);
+            logAI(`Memindai ID: ${dataRow.id} Sukses.`);
+        }
+        updateTable();
+        document.getElementById('loader-overlay').classList.add('hidden');
+        gray.delete(); thresh.delete();
+    }
+
+    function extract(grid, map, vals, ctx) {
+        let res = [];
+        for(let c=0; c<map.w; c++) {
+            let col = map.c + c, options = [];
+            for(let r=0; r<map.h; r++) {
+                let cell = grid[map.r + map.skipRow + r][col];
+                options.push({ v: vals[r] || '', d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy });
+            }
+            let sortedOpts = [...options].sort((a,b) => b.d - a.d);
+            let bestOpt = sortedOpts[0], secondBestOpt = sortedOpts[1];
+            let selected = ' ', isError = false;
+            
+            if (bestOpt && bestOpt.d >= bestOpt.area * 0.20) {
+                if (secondBestOpt && secondBestOpt.d >= bestOpt.d * 0.60) { isError = true; selected = '*'; } 
+                else selected = bestOpt.v;
+                
+                ctx.beginPath(); ctx.arc(bestOpt.cx, bestOpt.cy, 8, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill(); 
+                ctx.beginPath(); ctx.arc(bestOpt.cx, bestOpt.cy, 16, 0, 2 * Math.PI); ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 3; ctx.stroke(); 
+
+                if (isError && secondBestOpt) {
+                    ctx.beginPath(); ctx.arc(secondBestOpt.cx, secondBestOpt.cy, 8, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill(); 
+                    ctx.beginPath(); ctx.arc(secondBestOpt.cx, secondBestOpt.cy, 16, 0, 2 * Math.PI); ctx.strokeStyle = "#3b82f6"; ctx.lineWidth = 3; ctx.stroke(); 
+                }
+            }
+            res.push(selected);
+        }
+        return res.join('').trim() || "-";
+    }
+
+    function grade(grid, ctx, key) {
+        let map = MATRIX_MAP.answers, answers = [], qCount = 0;
+        for(let block of map.blocks) {
+            for(let r=0; r<map.qPerCol; r++) {
+                if(qCount >= key.length) break;
+                let opts = [];
+                for(let i=0; i<4; i++) {
+                    let cell = grid[map.startRow + map.skipRow + r][block.startCol + map.optionOffset + i];
+                    opts.push({ v:['A','B','C','D'][i], d:cell.density, area:cell.area, cx: cell.cx, cy: cell.cy });
+                }
+                
+                let sortedOpts = [...opts].sort((a,b) => b.d - a.d);
+                let bestOpt = sortedOpts[0], secondBestOpt = sortedOpts[1];
+                let keyChar = key[qCount], selected = '-', isError = false;
+                
+                if (bestOpt && bestOpt.d >= bestOpt.area * 0.20) {
+                    if (secondBestOpt && secondBestOpt.d >= bestOpt.d * 0.60) { isError = true; selected = '*'; } 
+                    else selected = bestOpt.v;
+                }
+
+                let keyOpt = opts.find(o => o.v === keyChar);
+                if (keyOpt) { ctx.beginPath(); ctx.arc(keyOpt.cx, keyOpt.cy, 8, 0, 2 * Math.PI); ctx.fillStyle = "#10b981"; ctx.fill(); }
+
+                if (bestOpt && bestOpt.d >= bestOpt.area * 0.20) {
+                    ctx.beginPath(); ctx.arc(bestOpt.cx, bestOpt.cy, 16, 0, 2 * Math.PI);
+                    ctx.strokeStyle = (bestOpt.v === keyChar && !isError) ? "#10b981" : "#ef4444"; ctx.lineWidth = 3; ctx.stroke();
+                    if (isError && secondBestOpt) {
+                        ctx.beginPath(); ctx.arc(secondBestOpt.cx, secondBestOpt.cy, 16, 0, 2 * Math.PI); ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 3; ctx.stroke();
+                    }
+                }
+                answers.push(selected); qCount++;
+            }
+        }
+        
+        let trueCount = answers.filter((a,i) => a === key[i]).length;
+        let falseCount = answers.filter((a,i) => a !== '-' && a !== '*' && a !== key[i]).length;
+        let emptyCount = answers.filter(a => a === '-' || a === '*').length;
+        
+        let correctNumbersArray = [], wrongNumbersArray = [];
+        answers.forEach((a, i) => { 
+            if(a === key[i]) correctNumbersArray.push(i + 1); 
+            else if(a !== '-' && a !== '*') wrongNumbersArray.push(i + 1);
+        });
+
+        return { trueCount, falseCount, emptyCount, answers, correctNumbers: correctNumbersArray, wrongNumbers: wrongNumbersArray };
+    }
+
+    function updateTable() {
+        let tbody = document.getElementById('result-table-body');
+        tbody.innerHTML = '';
+        resultData.forEach(d => {
+            let tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 border-b border-slate-100 text-sm";
+            tr.innerHTML = `
+                <td class="p-4">${d.id}</td>
+                <td class="p-4 font-bold text-slate-800 uppercase">${d.name}</td>
+                <td class="p-4">${d.kelas}</td>
+                <td class="p-4">${d.absen}</td>
+                <td class="p-4 text-emerald-600 font-bold">${d.trueCount}</td>
+                <td class="p-4 text-red-600 font-bold">${d.falseCount}</td>
+                <td class="p-4 text-slate-600 font-bold bg-slate-50/50">${d.emptyCount}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.correctNumbers.join(', ')}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.wrongNumbers.join(', ')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showPopupResult(data) {
+        document.getElementById('modal-name').innerText = data.name;
+        document.getElementById('modal-kelas-absen').innerText = `${data.kelas} / ${data.absen}`;
+        document.getElementById('modal-benar').innerText = data.trueCount; 
+        const modal = document.getElementById('result-modal');
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        document.body.classList.add('modal-active');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('result-modal');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        document.body.classList.remove('modal-active');
+    }
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+        if (!resultData.length) return alert("Belum ada data nilai.");
+        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({
+            "No": d.id, "Nama Siswa": d.name, "Kelas": d.kelas, "No. Absen": d.absen,
+            "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, 
+            "Detail Nomor Benar": d.correctNumbers.join(', '), 
+            "Detail Nomor Salah": d.wrongNumbers.join(', '), 
+            "Detail Jawaban Lengkap": d.answers.join('')
+        })));
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Nilai Siswa");
+        XLSX.writeFile(wb, `Hasil_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    });
+</script>
+</body>
+</html>
