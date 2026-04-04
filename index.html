@@ -428,7 +428,7 @@
             let bestOpt = sortedOpts[0], secondBestOpt = sortedOpts[1];
             let selected = ' ', isError = false;
             
-            if (bestOpt && bestOpt.d >= bestOpt.area * 0.36) {
+            if (bestOpt && bestOpt.d >= bestOpt.area * 0.27) {
                 if (secondBestOpt && secondBestOpt.d >= bestOpt.d * 0.81) { isError = true; selected = '*'; } 
                 else selected = bestOpt.v;
                 
@@ -460,7 +460,7 @@
                 let bestOpt = sortedOpts[0], secondBestOpt = sortedOpts[1];
                 let keyChar = key[qCount], selected = '-', isError = false;
                 
-                if (bestOpt && bestOpt.d >= bestOpt.area * 0.36) {
+                if (bestOpt && bestOpt.d >= bestOpt.area * 0.27) {
                     if (secondBestOpt && secondBestOpt.d >= bestOpt.d * 0.81) { isError = true; selected = '*'; } 
                     else selected = bestOpt.v;
                 }
@@ -468,7 +468,7 @@
                 let keyOpt = opts.find(o => o.v === keyChar);
                 if (keyOpt) { ctx.beginPath(); ctx.arc(keyOpt.cx, keyOpt.cy, 8, 0, 2 * Math.PI); ctx.fillStyle = "#10b981"; ctx.fill(); }
 
-                if (bestOpt && bestOpt.d >= bestOpt.area * 0.36) {
+                if (bestOpt && bestOpt.d >= bestOpt.area * 0.27) {
                     ctx.beginPath(); ctx.arc(bestOpt.cx, bestOpt.cy, 16, 0, 2 * Math.PI);
                     ctx.strokeStyle = (bestOpt.v === keyChar && !isError) ? "#10b981" : "#ef4444"; ctx.lineWidth = 3; ctx.stroke();
                     if (isError && secondBestOpt) {
