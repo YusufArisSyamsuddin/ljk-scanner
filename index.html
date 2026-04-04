@@ -37,12 +37,12 @@
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
                 <span>Parameter Engine</span>
-                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">OMR v3.0 (Optimized)</span>
+                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">OMR v4.0 (Dynamic)</span>
             </h2>
             <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-24 overflow-y-auto shadow-inner leading-relaxed" id="ai-log">
-                > Engine Optik Ringan & Cepat... Siap.<br>
-                > Sensor Golden Ratio (0.50x) & Anti-Shadow... Aktif.<br>
-                > Filter Erosi Teks Cerdas... Menunggu Dokumen.<br>
+                > Inisialisasi Modul OMR Optik... Siap.<br>
+                > Toleransi Pensil Tipis / Non-2B... Aktif.<br>
+                > Dynamic Local Noise Evaluation... Siap.<br>
             </div>
             <div>
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-2 text-slate-700 uppercase">Kunci Jawaban (N)</label>
@@ -140,14 +140,13 @@
                 </div>
             </div>
             <div class="flex justify-end gap-3 pt-2 border-t border-slate-100 mt-2" id="modal-actions">
-                <!-- Tombol dinamis diisi lewat JavaScript -->
+                <!-- Dinamis diisi via JS -->
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // --- KONFIGURASI GRID ---
     const FRAME_W_GRIDS = 42.0, FRAME_H_GRIDS = 59.0;
     const WARP_W = 1260, WARP_H = 1770; 
     const STROKE_THICKNESS = 8; 
@@ -165,33 +164,27 @@
 
     let resultData = [], scanCounter = 1, globalWarpedMat = null, smoothedMarkers = null, videoScanLoop = null, autoCaptureLockCount = 0;
     const AUTO_CAPTURE_THRESHOLD = 15; 
-    
     let pendingUpdateData = null, pendingUpdateIndex = -1;
 
     const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas'), hiddenCanvas = document.getElementById('hidden-canvas'), resultCanvas = document.getElementById('result-canvas'), scanStatus = document.getElementById('scan-status'), answerKeyInput = document.getElementById('answer-key'), lblAnswerKey = document.getElementById('lbl-answer-key');
     
-    function updateAnswerKeyLabel() {
-        if (!answerKeyInput || !lblAnswerKey) return;
+    if (answerKeyInput) answerKeyInput.addEventListener('input', () => {
         const charCount = answerKeyInput.value.replace(/[^A-D]/gi, '').length;
         lblAnswerKey.innerText = charCount > 0 ? `Kunci Jawaban (${charCount})` : `Kunci Jawaban (N)`;
-    }
-    if (answerKeyInput) answerKeyInput.addEventListener('input', updateAnswerKeyLabel);
+    });
 
     function validateKey() {
-        const key = answerKeyInput.value.replace(/[^A-D]/gi, '');
-        if (!key || key.length === 0) {
-            alert("Halo Bapak/Ibu, Kunci Jawaban masih kosong.\n\nMohon isi terlebih dahulu kotak Kunci Jawaban (misalnya: ABCDABCD...) sebelum memindai atau mengunggah LJK.");
-            answerKeyInput.focus();
-            return false;
-        }
-        return true;
+        if (!answerKeyInput.value.replace(/[^A-D]/gi, '')) {
+            alert("Halo Bapak/Ibu, Kunci Jawaban masih kosong.\nMohon isi terlebih dahulu (misal: ABCD...) sebelum memindai LJK.");
+            answerKeyInput.focus(); return false;
+        } return true;
     }
 
     function logAI(msg) {
         const logBox = document.getElementById('ai-log');
         if (logBox) { 
-            let timestamp = new Date().toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            logBox.innerHTML += `> [${timestamp}] ${msg}<br>`; 
+            let t = new Date().toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            logBox.innerHTML += `> [${t}] ${msg}<br>`; 
             logBox.scrollTop = logBox.scrollHeight; 
         }
     }
@@ -212,12 +205,9 @@
         }
     }, 500);
 
-    // --- MANAJEMEN KAMERA & UPLOAD ---
     document.getElementById('btn-camera').addEventListener('click', async () => {
         if (!validateKey()) return; 
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { 
-            alert("Kamera tidak tersedia."); return; 
-        }
+        if (!navigator.mediaDevices) return alert("Kamera tidak tersedia.");
         resetUI(); video.classList.remove('hidden'); overlayCanvas.classList.remove('hidden');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
@@ -234,8 +224,7 @@
     });
 
     document.getElementById('file-upload').addEventListener('change', (e) => {
-        if (!validateKey()) { e.target.value = ''; return; }
-        const file = e.target.files[0]; if (!file) return;
+        if (!validateKey() || !e.target.files[0]) { e.target.value = ''; return; }
         resetUI();
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -249,22 +238,19 @@
             };
             img.src = ev.target.result;
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(e.target.files[0]);
     });
 
-    // --- FUNGSI DETEKSI BINGKAI KERTAS ---
     function findOuterFrame(src) {
         if (!src || src.empty()) return null;
         let gray = new cv.Mat(), blur = new cv.Mat(), thresh = new cv.Mat();
         cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-        
         cv.normalize(gray, gray, 0, 255, cv.NORM_MINMAX);
         cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
         cv.adaptiveThreshold(blur, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 71, 15);
         
         let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-        cv.dilate(thresh, thresh, kernel);
-        kernel.delete();
+        cv.dilate(thresh, thresh, kernel); kernel.delete();
         
         let cnts = new cv.MatVector(), hi = new cv.Mat(), maxArea = 0, bestApprox = null;
         cv.findContours(thresh, cnts, hi, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
@@ -275,11 +261,9 @@
                 let approx = new cv.Mat();
                 cv.approxPolyDP(c, approx, 0.02 * cv.arcLength(c, true), true);
                 if (approx.rows === 4 && area > maxArea) {
-                    maxArea = area;
-                    if (bestApprox) bestApprox.delete();
+                    maxArea = area; if (bestApprox) bestApprox.delete();
                     bestApprox = approx.clone();
-                }
-                approx.delete();
+                } approx.delete();
             }
         }
         
@@ -287,8 +271,7 @@
         if (bestApprox) {
             let pts = [];
             for (let i = 0; i < 4; i++) pts.push({ x: bestApprox.data32S[i * 2], y: bestApprox.data32S[i * 2 + 1] });
-            bestApprox.delete();
-            pts.sort((a, b) => a.y - b.y);
+            bestApprox.delete(); pts.sort((a, b) => a.y - b.y);
             let top = pts.slice(0, 2).sort((a, b) => a.x - b.x), bottom = pts.slice(2, 4).sort((a, b) => a.x - b.x);
             result = { tl: top[0], tr: top[1], br: bottom[1], bl: bottom[0] };
         }
@@ -312,8 +295,7 @@
                             ['tl', 'tr', 'br', 'bl'].forEach(k => {
                                 smoothedMarkers[k].x = smoothedMarkers[k].x * 0.7 + frame[k].x * 0.3;
                                 smoothedMarkers[k].y = smoothedMarkers[k].y * 0.7 + frame[k].y * 0.3;
-                            });
-                            autoCaptureLockCount++;
+                            }); autoCaptureLockCount++;
                         }
                         ctx.lineWidth = 4; ctx.strokeStyle = "#10b981"; ctx.beginPath(); 
                         ctx.moveTo(smoothedMarkers.tl.x, smoothedMarkers.tl.y); ctx.lineTo(smoothedMarkers.tr.x, smoothedMarkers.tr.y); 
@@ -339,8 +321,7 @@
         let captureCanvas = document.createElement('canvas');
         captureCanvas.width = video.videoWidth; captureCanvas.height = video.videoHeight;
         captureCanvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        resetUI();
-        document.getElementById('loader-overlay').classList.remove('hidden');
+        resetUI(); document.getElementById('loader-overlay').classList.remove('hidden');
         setTimeout(() => processLJKBase(captureCanvas), 200);
     }
 
@@ -349,7 +330,7 @@
         try {
             src = cv.imread(canvas);
             let f = findOuterFrame(src);
-            if (!f) throw new Error("Gagal mengunci bingkai. Pastikan kertas utuh & cukup terang.");
+            if (!f) throw new Error("Gagal mengunci bingkai. Pastikan kertas utuh & pencahayaan cukup.");
 
             if (globalWarpedMat) globalWarpedMat.delete();
             globalWarpedMat = new cv.Mat.zeros(WARP_H, WARP_W, cv.CV_8UC4);
@@ -371,24 +352,18 @@
         } finally { if(src) src.delete(); }
     }
 
-    // --- ALGORITMA EVALUASI ARSIRAN UTAMA ---
     function applyGridMatrix(isNewScan = false) {
         if(!globalWarpedMat) return;
         cv.imshow('result-canvas', globalWarpedMat);
         let ctx = resultCanvas.getContext('2d');
 
-        let innerW = WARP_W - (STROKE_THICKNESS * 2);
-        let innerH = WARP_H - (STROKE_THICKNESS * 2);
-        
-        let stepX = (innerW / FRAME_W_GRIDS) - 0.05;
-        let stepY = (innerH / FRAME_H_GRIDS) - 0.05;
-        let offsetX = 1.7;
-        let offsetY = 2.1;
+        let innerW = WARP_W - (STROKE_THICKNESS * 2), innerH = WARP_H - (STROKE_THICKNESS * 2);
+        let stepX = (innerW / FRAME_W_GRIDS) - 0.05, stepY = (innerH / FRAME_H_GRIDS) - 0.05;
+        let offsetX = 1.7, offsetY = 2.1;
 
         let startX = STROKE_THICKNESS + (MARGIN_LEFT_GRIDS * stepX) + offsetX;
         let startY = STROKE_THICKNESS + (MARGIN_TOP_GRIDS * stepY) + offsetY;
-        let matrixW = GRID_COLS * stepX;
-        let matrixH = GRID_ROWS * stepY;
+        let matrixW = GRID_COLS * stepX, matrixH = GRID_ROWS * stepY;
         
         ctx.strokeStyle = "rgba(239, 68, 68, 0.4)"; ctx.lineWidth = 2; ctx.strokeRect(startX, startY, matrixW, matrixH);
         ctx.strokeStyle = "rgba(239, 68, 68, 0.2)"; ctx.lineWidth = 1;
@@ -399,20 +374,20 @@
         cv.cvtColor(globalWarpedMat, gray, cv.COLOR_RGBA2GRAY, 0);
         cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
         
-        // 1. FILTER BAYANGAN EKSTREM (C=22)
-        cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 81, 22);
+        // MODIFIKASI AMAN 1: C diturunkan dari 22 ke 18. 
+        // Sangat cukup mengusir bayangan, namun tidak memusnahkan arsiran anak yang tipis/kurang ditekan.
+        cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 81, 18);
 
-        // Menghancurkan teks/angka yang garisnya tipis (kernel 5x5)
+        // Menghancurkan garis tepi dan huruf kecil di dalam lingkaran (Kernel 5x5)
         let M_kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
-        cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, M_kernel);
-        M_kernel.delete();
+        cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, M_kernel); M_kernel.delete();
 
         let gridData = [];
         for(let r=0; r<GRID_ROWS; r++) {
             gridData[r] = [];
             for(let c=0; c<GRID_COLS; c++) {
                 let cx = startX + (c * stepX) + (stepX / 2), cy = startY + (r * stepY) + (stepY / 2);
-                let coreSize = Math.floor(stepX * 0.50); // Sensor Golden Ratio
+                let coreSize = Math.floor(stepX * 0.50); // Sensor Golden Ratio 50%
                 let rect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
                 let roi = thresh.roi(rect);
                 gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy };
@@ -433,75 +408,80 @@
             if (existingIndex !== -1) {
                 dataRow.id = resultData[existingIndex].id;
                 showPopupResult(dataRow, true, existingIndex);
-                logAI(`Peringatan: Absen ${dataRow.absen} (Kls ${dataRow.kelas}) sudah ada.`);
+                logAI(`Peringatan: Absen ${dataRow.absen} (Kls ${dataRow.kelas}) terdeteksi duplikat.`);
             } else {
                 dataRow.id = scanCounter++;
                 resultData.push(dataRow);
                 showPopupResult(dataRow, false);
                 updateTable();
-                logAI(`Sukses: Absen ${dataRow.absen} berhasil dipindai.`);
+                logAI(`Sukses: Data Absen ${dataRow.absen} diekstrak sempurna.`);
             }
-        } else {
-            updateTable();
-        }
+        } else { updateTable(); }
+        
         document.getElementById('loader-overlay').classList.add('hidden');
         gray.delete(); thresh.delete();
     }
 
-    // --- HELPER FUNGSI: PENYEDERHANAAN LOGIKA EVALUASI ---
-    // Fungsi ini menggabungkan logika evaluasi untuk Identitas maupun Jawaban agar tidak redundan.
+    // --- FUNGSI CERDAS: DYNAMIC LOCAL NOISE EVALUATION ---
     function evaluateCellGroup(opts, ctx, keyChar = null) {
         let sortedOpts = [...opts].sort((a,b) => b.d - a.d);
         let best = sortedOpts[0], second = sortedOpts[1];
         let selected = keyChar === null ? ' ' : '-'; 
         let isError = false;
 
-        let fillRatio = best ? (best.d / best.area) : 0;
+        // MENGHITUNG KEBISINGAN LOKAL (KOTORAN KERTAS PADA BARIS TERSEBUT)
+        let backgroundNoise = 0, noiseSamples = 0;
+        // Kita hanya hitung rata-rata dari opsi yang (kemungkinan besar) tidak diarsir
+        for(let i = Math.max(1, Math.floor(sortedOpts.length / 2)); i < sortedOpts.length; i++) {
+            backgroundNoise += sortedOpts[i].d;
+            noiseSamples++;
+        }
+        backgroundNoise = noiseSamples > 0 ? (backgroundNoise / noiseSamples) : 0;
+        
+        // Safety net: mencegah pembagian dengan 0 jika kertas super putih
+        let effectiveNoise = Math.max(backgroundNoise, best ? best.area * 0.02 : 1);
 
-        // Syarat Mutlak: Kepadatan > 25%
-        if (best && fillRatio >= 0.25) {
-            let secondFillRatio = second ? (second.d / second.area) : 0;
-            // Syarat Ganda/Bintang: Arsiran ke-2 wajib >65% dari yang pertama, DAN terisi >15% area.
-            if (second && second.d >= best.d * 0.65 && secondFillRatio >= 0.15) { 
-                isError = true; 
-                selected = '*'; 
-            } else {
-                selected = best.v;
-            }
+        let fillRatio = best ? (best.d / best.area) : 0;
+        let secondFillRatio = second ? (second.d / second.area) : 0;
+
+        // KEPUTUSAN EVALUASI (GABUNGAN ABSOLUT & RELATIF)
+        // 1. Absolut: Arsiran diturunkan dari 25% ke 15% (Mentoleransi pensil tipis HB/anak-anak yang tidak menekan)
+        // 2. Relatif: Arsiran wajib 3x lipat (3.0) lebih gelap dibanding rata-rata kertas kosong di sekitarnya
+        if (best && fillRatio >= 0.15 && (best.d / effectiveNoise) >= 3.0) {
+            
+            // Logika Deteksi Coretan/Hapusan Ganda
+            if (second && second.d >= best.d * 0.65 && secondFillRatio >= 0.10) { 
+                isError = true; selected = '*'; 
+            } else { selected = best.v; }
         }
 
-        // --- PENGGAMBARAN VISUAL (CANVAS) ---
-        // Jika mode Jawaban, gambar tanda kunci jawaban warna hijau
+        // --- PENGGAMBARAN VISUAL CANVA ---
         if (keyChar !== null) {
             let keyOpt = opts.find(o => o.v === keyChar);
             if (keyOpt) { ctx.beginPath(); ctx.arc(keyOpt.cx, keyOpt.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#10b981"; ctx.fill(); }
         }
 
-        if (best && fillRatio >= 0.25) {
+        // Lingkaran biru jika sah terbaca sebagai arsiran
+        if (best && fillRatio >= 0.15 && (best.d / effectiveNoise) >= 3.0) {
             ctx.beginPath(); ctx.arc(best.cx, best.cy, 14, 0, 2 * Math.PI); ctx.lineWidth = 3;
             if (keyChar !== null) {
                 ctx.strokeStyle = (best.v === keyChar && !isError) ? "#10b981" : "#ef4444";
             } else {
-                ctx.strokeStyle = "#3b82f6";
-                ctx.stroke();
+                ctx.strokeStyle = "#3b82f6"; ctx.stroke();
                 ctx.beginPath(); ctx.arc(best.cx, best.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill();
             }
             ctx.stroke();
 
-            // Jika error bintang, lingkari juga yang nomor dua
+            // Jika error *, tandai kedua jawaban yang bersaing
             if (isError && second) {
                 ctx.beginPath(); ctx.arc(second.cx, second.cy, 14, 0, 2 * Math.PI); ctx.lineWidth = 3;
-                ctx.strokeStyle = keyChar !== null ? "#ef4444" : "#3b82f6";
-                ctx.stroke();
-                if (keyChar === null) {
-                    ctx.beginPath(); ctx.arc(second.cx, second.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill();
-                }
+                ctx.strokeStyle = keyChar !== null ? "#ef4444" : "#3b82f6"; ctx.stroke();
+                if (keyChar === null) { ctx.beginPath(); ctx.arc(second.cx, second.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill(); }
             }
         }
         return selected;
     }
 
-    // Pemanggilan evaluasi untuk Area Identitas (Nama/Kelas/Absen)
     function extractIdentity(grid, map, vals, ctx) {
         let res = [];
         for(let c=0; c<map.w; c++) {
@@ -509,13 +489,10 @@
             for(let r=0; r<map.h; r++) {
                 let cell = grid[map.r + map.skipRow + r][col];
                 opts.push({ v: vals[r] || '', d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy });
-            }
-            res.push(evaluateCellGroup(opts, ctx, null));
-        }
-        return res.join('').trim() || "-";
+            } res.push(evaluateCellGroup(opts, ctx, null));
+        } return res.join('').trim() || "-";
     }
 
-    // Pemanggilan evaluasi untuk Area Jawaban (A-D)
     function gradeAnswers(grid, ctx, key) {
         let map = MATRIX_MAP.answers, answers = [], qCount = 0;
         for(let block of map.blocks) {
@@ -526,16 +503,15 @@
                     let cell = grid[map.startRow + map.skipRow + r][block.startCol + map.optionOffset + i];
                     opts.push({ v:['A','B','C','D'][i], d:cell.density, area:cell.area, cx: cell.cx, cy: cell.cy });
                 }
-                answers.push(evaluateCellGroup(opts, ctx, key[qCount]));
-                qCount++;
+                answers.push(evaluateCellGroup(opts, ctx, key[qCount])); qCount++;
             }
         }
         
         let trueCount = answers.filter((a,i) => a === key[i]).length;
         let falseCount = answers.filter((a,i) => a !== '-' && a !== '*' && a !== key[i]).length;
         let emptyCount = answers.filter(a => a === '-' || a === '*').length;
-        
         let correctNumbersArray = [], wrongNumbersArray = [];
+        
         answers.forEach((a, i) => { 
             if(a === key[i]) correctNumbersArray.push(i + 1); 
             else if(a !== '-' && a !== '*') wrongNumbersArray.push(i + 1);
@@ -546,11 +522,9 @@
 
     // --- MANAJEMEN TABEL ---
     function updateTable() {
-        let tbody = document.getElementById('result-table-body');
-        tbody.innerHTML = '';
+        let tbody = document.getElementById('result-table-body'); tbody.innerHTML = '';
         resultData.forEach(d => {
-            let tr = document.createElement('tr');
-            tr.className = "hover:bg-slate-50 border-b border-slate-100 text-sm transition-colors";
+            let tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 border-b border-slate-100 text-sm transition-colors";
             tr.innerHTML = `
                 <td class="p-4">${d.id}</td>
                 <td class="p-4 font-bold text-slate-800 uppercase">${d.name}</td>
@@ -562,8 +536,7 @@
                 <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px] leading-relaxed">${d.correctNumbers.join(', ')}</td>
                 <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px] leading-relaxed">${d.wrongNumbers.join(', ')}</td>
                 <td class="p-4 text-slate-800 font-mono text-xs tracking-widest bg-slate-50">${d.answers.join('')}</td>
-            `;
-            tbody.appendChild(tr);
+            `; tbody.appendChild(tr);
         });
     }
 
@@ -578,65 +551,33 @@
         actionsDiv.innerHTML = '';
 
         if (isDuplicate) {
-            pendingUpdateData = data;
-            pendingUpdateIndex = index;
-            modalTitle.innerText = "Peringatan: Data Sudah Ada!";
-            modalTitle.classList.replace('text-emerald-600', 'text-yellow-600');
+            pendingUpdateData = data; pendingUpdateIndex = index;
+            modalTitle.innerText = "Peringatan: Data Sudah Ada!"; modalTitle.classList.replace('text-emerald-600', 'text-yellow-600');
             
-            let btnCancel = document.createElement('button');
-            btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition";
-            btnCancel.innerText = "Batal (Abaikan)";
-            btnCancel.addEventListener('click', closeModal);
-            
-            let btnUpdate = document.createElement('button');
-            btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition shadow-md flex-1";
-            btnUpdate.innerText = "Update Data (Timpa)";
+            let btnCancel = document.createElement('button'); btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition"; btnCancel.innerText = "Batal (Abaikan)"; btnCancel.addEventListener('click', closeModal);
+            let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition shadow-md flex-1"; btnUpdate.innerText = "Update Data (Timpa)";
             btnUpdate.addEventListener('click', function() {
                 if (pendingUpdateIndex !== -1 && pendingUpdateData) {
                     resultData[pendingUpdateIndex] = pendingUpdateData;
-                    updateTable();
-                    logAI(`Data Kelas ${pendingUpdateData.kelas} Absen ${pendingUpdateData.absen} berhasil diperbarui.`);
-                    closeModal();
+                    updateTable(); logAI(`Data Absen ${pendingUpdateData.absen} berhasil diperbarui.`); closeModal();
                 }
             });
-            
-            actionsDiv.appendChild(btnCancel);
-            actionsDiv.appendChild(btnUpdate);
+            actionsDiv.appendChild(btnCancel); actionsDiv.appendChild(btnUpdate);
         } else {
-            modalTitle.innerText = "Berhasil Dipindai!";
-            modalTitle.classList.replace('text-yellow-600', 'text-emerald-600');
-            
-            let btnClose = document.createElement('button');
-            btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 w-full text-center transition shadow-md";
-            btnClose.innerText = "Tutup & Lanjut";
-            btnClose.addEventListener('click', closeModal);
-            
+            modalTitle.innerText = "Berhasil Dipindai!"; modalTitle.classList.replace('text-yellow-600', 'text-emerald-600');
+            let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 w-full text-center transition shadow-md"; btnClose.innerText = "Tutup & Lanjut"; btnClose.addEventListener('click', closeModal);
             actionsDiv.appendChild(btnClose);
         }
-
-        const modal = document.getElementById('result-modal');
-        modal.classList.remove('opacity-0', 'pointer-events-none');
-        document.body.classList.add('modal-active');
+        document.getElementById('result-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active');
     }
 
     document.getElementById('btn-close-top').addEventListener('click', closeModal);
-
-    function closeModal() {
-        const modal = document.getElementById('result-modal');
-        modal.classList.add('opacity-0', 'pointer-events-none');
-        document.body.classList.remove('modal-active');
-        pendingUpdateData = null;
-        pendingUpdateIndex = -1;
-    }
+    function closeModal() { document.getElementById('result-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); pendingUpdateData = null; pendingUpdateIndex = -1; }
 
     document.getElementById('btn-export').addEventListener('click', () => {
         if (!resultData.length) return alert("Belum ada data nilai yang bisa didownload.");
         const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({
-            "No": d.id, "Nama Siswa": d.name, "Kelas": d.kelas, "No. Absen": d.absen,
-            "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, 
-            "Detail Nomor Benar": d.correctNumbers.join(', '), 
-            "Detail Nomor Salah": d.wrongNumbers.join(', '), 
-            "Rekaman Jawaban LJK": d.answers.join('')
+            "No": d.id, "Nama Siswa": d.name, "Kelas": d.kelas, "No. Absen": d.absen, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Nomor Benar": d.correctNumbers.join(', '), "Detail Nomor Salah": d.wrongNumbers.join(', '), "Rekaman Jawaban LJK": d.answers.join('')
         })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap LJK");
         XLSX.writeFile(wb, `Rekap_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
