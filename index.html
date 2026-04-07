@@ -14,6 +14,8 @@
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow: hidden; }
         #video-container { position: relative; width: 100%; height: 100%; min-height: 500px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 0.5rem; }
+        /* Perbesaran 2.0x untuk presisi bidik luar biasa */
+        .telephoto-zoom { transform: scale(2.0); transform-origin: center; transition: transform 0.3s ease; }
         #video, #overlay-canvas, #result-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
         #result-canvas { z-index: 40; }
         #overlay-canvas { z-index: 30; }
@@ -26,7 +28,7 @@
     <header class="bg-slate-900 text-white rounded-xl p-6 shadow-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b-4 border-emerald-500">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-emerald-400">LJK Scanner Pro</h1>
-            <p class="text-sm text-slate-300 mt-1">Ultra-Optimized Engine & Strict Edge Rejection</p>
+            <p class="text-sm text-slate-300 mt-1">v47.5 Line-in-White Logic (2.0x Zoom & Ultra Sync)</p>
         </div>
         <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700">
             <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV Memuat...
@@ -37,14 +39,15 @@
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
                 <span>Status Sistem</span>
-                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">OMR v25 (Deep Margin)</span>
+                <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v47.5 Professional</span>
             </h2>
             <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-56 overflow-y-auto shadow-inner leading-relaxed" id="ai-log">
                 > Sistem Dimulai.<br>
-                > Deep Scan Margin (RETR_LIST)... Aktif.<br>
-                > X-Ray Batas Kertas (Adaptive)... Aktif.<br>
-                > Fiducial Safe Zone (12%)... Aktif.<br>
-                > Piecewise Dual-Warp... Aktif.<br>
+                > Bug 'cy undefined'... Fixed.<br>
+                > Sinkronisasi Universal Zoom 2.0x... Aktif.<br>
+                > Logika "Line-in-White" (Anti Meja Gelap)... Aktif.<br>
+                > Throttling CPU (10 FPS)... Aktif.<br>
+                > Menunggu aksi pengguna...<br>
             </div>
             <div>
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-2 text-slate-700 uppercase">Kunci Jawaban (N)</label>
@@ -54,22 +57,28 @@
 
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col relative">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 flex justify-between items-center text-slate-800">
-                <span>Layar Tracking & Pratinjau</span>
+                <span>Layar Tracking (Telephoto 2.0x)</span>
                 <span id="scan-status" class="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-500 rounded-full border border-slate-200">Menunggu Aksi...</span>
             </h2>
             <div id="video-container" class="relative w-full bg-[#0f172a] rounded-lg overflow-hidden flex-1 min-h-[500px] flex items-center justify-center checkerboard">
                 <div id="placeholder-text" class="text-slate-400 text-sm font-medium text-center px-4 leading-relaxed absolute z-0">
                     <svg class="w-16 h-16 mx-auto mb-3 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"></path></svg>
                     Arahkan kamera ke LJK atau Upload Scan.<br>
-                    <span class="text-xs text-emerald-500/70">(Super Ringan, Anti Bingkai Hitam, Bebas Distorsi)</span>
+                    <span class="text-xs text-emerald-400">Paskan seluruh batas garis tercetak LJK di dalam layar.</span>
                 </div>
-                <video id="video" playsinline autoplay muted class="hidden"></video>
-                <canvas id="overlay-canvas" class="hidden pointer-events-none"></canvas>
+                <video id="video" playsinline autoplay muted class="hidden telephoto-zoom"></video>
+                <canvas id="overlay-canvas" class="hidden pointer-events-none telephoto-zoom"></canvas>
                 <canvas id="result-canvas" class="hidden z-40 bg-white"></canvas>
+                
+                <button id="btn-manual-capture" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-emerald-600 px-6 py-3 rounded-full font-bold shadow-2xl z-50 border-2 border-emerald-500 hover:bg-emerald-50 transition active:scale-95 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Jepret Manual
+                </button>
+
                 <div id="loader-overlay" class="absolute inset-0 bg-slate-900/90 hidden flex-col justify-center items-center z-50 backdrop-blur-sm">
                     <div class="loader mb-4"></div>
                     <p id="loader-text" class="text-xs font-bold text-emerald-400 tracking-widest animate-pulse uppercase text-center leading-relaxed">
-                        Memproses Gambar...<br>Jangan tutup layar
+                        Memproses Gambar...
                     </p>
                 </div>
             </div>
@@ -89,7 +98,7 @@
         </div>
     </div>
 
-    <!-- Tabel Hasil -->
+    <!-- Tabel Rekapitulasi -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-4 gap-4">
             <h2 class="font-bold text-xl text-slate-800">Rekapitulasi Nilai LJK</h2>
@@ -120,28 +129,38 @@
     </div>
 </div>
 
-<!-- Modal Pop Up -->
+<!-- Modal Popups -->
 <div id="result-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[100]">
     <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
     <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded-xl shadow-2xl z-50 transform scale-95 transition-transform duration-300 overflow-hidden">
         <div class="modal-content py-6 text-left px-6">
             <div class="flex justify-between items-center pb-4 border-b border-slate-100">
                 <p id="modal-title" class="text-xl font-black text-emerald-600">Berhasil Dipindai!</p>
-                <div class="modal-close cursor-pointer z-50 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition" id="btn-close-top">
+                <div class="modal-close cursor-pointer z-50 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition" onclick="closeModal('result-modal')">
                     <svg class="fill-current text-slate-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
                 </div>
             </div>
             <div class="my-6 text-center">
                 <p class="text-xs text-slate-500 mb-1 font-medium">Nama Lengkap</p>
-                <h3 id="modal-name" class="text-lg font-black text-slate-800 mb-5 uppercase tracking-wide">-</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Kelas / Absen</p>
-                        <p id="modal-kelas-absen" class="text-lg font-black text-slate-800">-</p>
+                <h3 id="modal-name" class="text-lg font-black text-slate-800 mb-4 uppercase tracking-wide">-</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Kelas / Absen</p>
+                        <p id="modal-kelas-absen" class="text-base font-black text-slate-800">-</p>
                     </div>
-                    <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm">
-                        <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Skor Benar</p>
-                        <p id="modal-benar" class="text-2xl font-black text-emerald-600">-</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-center shadow-sm">
+                            <p class="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Benar</p>
+                            <p id="modal-benar" class="text-xl font-black text-emerald-600">-</p>
+                        </div>
+                        <div class="bg-red-50 p-3 rounded-xl border border-red-200 text-center shadow-sm">
+                            <p class="text-[9px] font-bold text-red-600 uppercase tracking-widest mb-1">Salah</p>
+                            <p id="modal-salah" class="text-xl font-black text-red-600">-</p>
+                        </div>
+                        <div class="bg-slate-100 p-3 rounded-xl border border-slate-200 text-center shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1">Kosong</p>
+                            <p id="modal-kosong" class="text-xl font-black text-slate-600">-</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,11 +169,33 @@
     </div>
 </div>
 
+<div id="alert-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[110]">
+    <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
+    <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6">
+        <svg class="mx-auto mb-4 text-yellow-500 w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <h3 class="text-lg font-black text-slate-800 mb-2">Pemberitahuan</h3>
+        <p id="alert-message" class="text-sm text-slate-600 mb-5 leading-relaxed"></p>
+        <button onclick="closeModal('alert-modal')" class="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold shadow hover:bg-emerald-700 transition">Mengerti</button>
+    </div>
+</div>
+
+<div id="confirm-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[110]">
+    <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
+    <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6">
+        <svg class="mx-auto mb-4 text-red-500 w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        <h3 class="text-lg font-black text-slate-800 mb-2">Hapus Data</h3>
+        <p class="text-sm text-slate-600 mb-5">Apakah Anda yakin ingin menghapus data LJK siswa ini dari tabel?</p>
+        <div class="flex gap-3 justify-center">
+            <button onclick="closeModal('confirm-modal')" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">Batal</button>
+            <button id="btn-confirm-delete" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-bold shadow hover:bg-red-700 transition">Hapus</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    // --- KONFIGURASI ABSOLUT OMR GRID ---
+    // --- KONSTANTA & VARIABEL GLOBAL ---
     const GRID_SIZE = 30; 
-    const FIDUCIAL_WARP_W = 40 * GRID_SIZE; // 1200
-    const FIDUCIAL_WARP_H = 57 * GRID_SIZE; // 1710
+    const FIDUCIAL_WARP_W = 40 * GRID_SIZE, FIDUCIAL_WARP_H = 57 * GRID_SIZE; 
     const START_X = 1 * GRID_SIZE, START_Y = 3 * GRID_SIZE;
     const GRID_COLS = 38, GRID_ROWS = 53;
 
@@ -162,36 +203,47 @@
         name: { c: 0, r: 0, w: 20, h: 26, skipRow: 2 }, 
         kelas: { c: 21, r: 14, w: 2, h: 12, skipRow: 2 }, 
         absen: { c: 24, r: 16, w: 3, h: 10, skipRow: 2 }, 
-        answers: { startRow: 29, skipRow: 1, qPerCol: 10, options: 4, blocks: [ { startCol: 0 }, { startCol: 5 }, { startCol: 10 }, { startCol: 15 }, { startCol: 20 } ], optionOffset: 1 }
+        answers: { startRow: 29, skipRow: 1, qPerCol: 10, options: 4, blocks: [{startCol:0}, {startCol:5}, {startCol:10}, {startCol:15}, {startCol:20}], optionOffset: 1 }
     };
+    
     const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
     const NUMBERS = "0123456789".split('');
     const KELAS_VALS = ['7','8','9','A','B','C','D','E','F','G','H','T'];
 
-    let resultData = [], scanCounter = 1, smoothedMarkers = null, videoScanLoop = null, autoCaptureLockCount = 0;
-    const AUTO_CAPTURE_THRESHOLD = 15; 
-    let pendingUpdateData = null, pendingUpdateIndex = -1;
+    let resultData = [], scanCounter = 1, smoothedMarkers = null, videoScanLoop = null;
+    let autoCaptureLockCount = 0, trackerLostFrames = 0; 
+    const AUTO_CAPTURE_THRESHOLD = 10;
+    let pendingUpdateData = null, pendingUpdateIndex = -1, pendingDeleteId = null;
 
-    const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas'), hiddenCanvas = document.getElementById('hidden-canvas'), resultCanvas = document.getElementById('result-canvas'), scanStatus = document.getElementById('scan-status'), answerKeyInput = document.getElementById('answer-key');
+    const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas');
+    const hiddenCanvas = document.getElementById('hidden-canvas'), resultCanvas = document.getElementById('result-canvas');
+    const scanStatus = document.getElementById('scan-status'), answerKeyInput = document.getElementById('answer-key');
+
+    // --- FUNGSI UTILITAS UI ---
+    function openModal(id) { document.getElementById(id).classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); }
+    function closeModal(id) { document.getElementById(id).classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); if(id==='result-modal'){ pendingUpdateData=null; pendingUpdateIndex=-1; } if(id==='confirm-modal'){ pendingDeleteId=null; } }
+    function showCustomAlert(msg) { document.getElementById('alert-message').innerText = msg; openModal('alert-modal'); }
+    function showDeleteConfirm(id) { pendingDeleteId = id; openModal('confirm-modal'); }
 
     if (answerKeyInput) answerKeyInput.addEventListener('input', () => {
-        const charCount = answerKeyInput.value.replace(/[^A-D]/gi, '').length;
-        document.getElementById('lbl-answer-key').innerText = charCount > 0 ? `Kunci Jawaban (${charCount})` : `Kunci Jawaban (N)`;
+        const count = answerKeyInput.value.replace(/[^A-D]/gi, '').length;
+        document.getElementById('lbl-answer-key').innerText = count > 0 ? `Kunci Jawaban (${count})` : `Kunci Jawaban (N)`;
     });
 
     function validateKey() {
-        if (!answerKeyInput.value.replace(/[^A-D]/gi, '')) {
-            alert("Kunci Jawaban masih kosong.\nMohon isi terlebih dahulu sebelum memindai LJK.");
-            answerKeyInput.focus(); return false;
-        } return true;
+        if (!answerKeyInput.value.replace(/[^A-D]/gi, '')) { showCustomAlert("Kunci Jawaban kosong.\nMohon isi terlebih dahulu."); answerKeyInput.focus(); return false; } 
+        return true;
     }
 
     function logAI(msg, isError = false) {
         const logBox = document.getElementById('ai-log');
         if (logBox) { 
             let t = new Date().toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            let formattedMsg = isError ? `<span class="text-red-500 font-bold">${msg}</span>` : msg;
-            logBox.innerHTML += `> [${t}] ${formattedMsg}<br>`; 
+            let newLog = `> [${t}] ${isError ? `<span class="text-red-500 font-bold">${msg}</span>` : msg}`;
+            let lines = logBox.innerHTML.split('<br>').filter(l => l.trim() !== '');
+            lines.push(newLog);
+            if (lines.length > 20) lines = lines.slice(lines.length - 20); 
+            logBox.innerHTML = lines.join('<br>') + '<br>';
             logBox.scrollTop = logBox.scrollHeight; 
         }
     }
@@ -201,327 +253,330 @@
         if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
         resultCanvas.classList.add('hidden'); resultCanvas.style.display = 'none';
         overlayCanvas.getContext('2d').clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        video.classList.add('hidden'); overlayCanvas.classList.add('hidden'); document.getElementById('placeholder-text').classList.add('hidden');
-        smoothedMarkers = null; autoCaptureLockCount = 0; scanStatus.innerText = "Kamera Nonaktif";
+        video.classList.add('hidden'); overlayCanvas.classList.add('hidden'); 
+        document.getElementById('placeholder-text').classList.add('hidden');
+        document.getElementById('btn-manual-capture').classList.add('hidden');
+        smoothedMarkers = null; autoCaptureLockCount = 0; trackerLostFrames = 0; 
+        scanStatus.innerText = "Kamera Nonaktif";
     }
 
-    const checkCV = setInterval(() => {
-        if (typeof cv !== 'undefined' && cv.Mat) {
-            clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> OpenCV Siap';
-        }
-    }, 500);
+    const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> OpenCV Siap'; } }, 500);
 
+    // --- KONTROL KAMERA HD ---
     document.getElementById('btn-camera').addEventListener('click', async () => {
         if (!validateKey()) return; 
-        if (!navigator.mediaDevices) return alert("Kamera tidak tersedia.");
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showCustomAlert("Akses kamera tidak diizinkan."); return; }
         resetUI(); video.classList.remove('hidden'); overlayCanvas.classList.remove('hidden');
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
+            });
             video.srcObject = stream;
             video.onloadedmetadata = () => {
                 video.play().then(() => {
-                    let scale = Math.min(640 / Math.max(video.videoWidth, video.videoHeight), 1.0);
+                    let scale = Math.min(1080 / Math.max(video.videoWidth, video.videoHeight), 1.0);
                     hiddenCanvas.width = video.videoWidth * scale; hiddenCanvas.height = video.videoHeight * scale;
                     overlayCanvas.width = hiddenCanvas.width; overlayCanvas.height = hiddenCanvas.height;
+                    document.getElementById('btn-manual-capture').classList.remove('hidden');
                     startStreamLoop();
                 });
             };
-        } catch (e) { alert("Akses kamera ditolak."); }
+        } catch (e) { logAI("Kamera Error: " + e.message, true); showCustomAlert("Akses kamera ditolak."); resetUI(); }
+    });
+
+    document.getElementById('btn-manual-capture').addEventListener('click', () => {
+        if (!video.paused && !video.ended) {
+            logAI("Jepret Manual dipicu. Melakukan Crop Sinkron 2.0x...");
+            if (videoScanLoop) cancelAnimationFrame(videoScanLoop);
+            executeCapture(true);
+        }
     });
 
     document.getElementById('file-upload').addEventListener('change', (e) => {
         if (!validateKey() || !e.target.files[0]) { e.target.value = ''; return; }
-        resetUI();
-        const reader = new FileReader();
+        resetUI(); const reader = new FileReader();
         reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
+            const img = new Image(); img.onload = () => {
                 let scale = Math.min(1600 / Math.max(img.width, img.height), 1.0);
                 hiddenCanvas.width = img.width * scale; hiddenCanvas.height = img.height * scale;
                 hiddenCanvas.getContext('2d').drawImage(img, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
                 document.getElementById('loader-overlay').classList.remove('hidden');
-                setTimeout(() => processLJKPipeline(hiddenCanvas), 100);
+                setTimeout(() => processLJKPipeline(hiddenCanvas, null, false), 100);
             }; img.src = ev.target.result;
         }; reader.readAsDataURL(e.target.files[0]);
     });
 
-    // --- LANGKAH 1: MENCARI GARIS PEMBATAS HITAM CETAKAN (Mengabaikan Meja Gelap) ---
+    // --- LOGIKA MURNI BAPAK: MENCARI GARIS TERCETAK DI DALAM AREA PUTIH ---
     function getPaperContour(src) {
+        let procMat = new cv.Mat();
+        let targetWidth = 800.0; 
+        let scaleRatio = targetWidth / src.cols;
+        cv.resize(src, procMat, new cv.Size(Math.round(src.cols * scaleRatio), Math.round(src.rows * scaleRatio)));
+
         let gray = new cv.Mat(), blur = new cv.Mat(), thresh = new cv.Mat();
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+        cv.cvtColor(procMat, gray, cv.COLOR_RGBA2GRAY, 0);
         
-        // Blur sedang untuk meredam tekstur kertas tanpa merusak garis
+        // Blur sedang untuk meredam tekstur meja atau kertas, tapi menjaga garis batas LJK tetap utuh
         cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
         
-        // KUNCI UTAMA: Menggunakan Adaptive Threshold untuk mengubah tinta hitam menjadi blok putih tegas.
-        // Ini membuat sistem 100% kebal terhadap warna background meja (gelap/terang tidak masalah)
-        cv.adaptiveThreshold(blur, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 10);
+        // RAHASIA LOGIKANYA DI SINI: Block Size kecil (41) agar Thresholding 
+        // hanya bereaksi pada "Garis Hitam yang dikelilingi Putih (Kertas)". 
+        // Bayangan besar atau meja gelap tidak akan terbaca sebagai garis karena diblokir oleh Block Size ini.
+        let blockSize = 41; 
+        cv.adaptiveThreshold(blur, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, blockSize, 10);
         
-        // Penebalan sedikit agar garis bingkai LJK yang mungkin terputus oleh debu/cetakan pudar bisa tersambung
-        let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-        cv.dilate(thresh, thresh, kernel); 
+        // Morphological Close: Menyambung garis-garis batas LJK yang mungkin putus akibat kualitas cetak/kamera
+        let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+        cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel);
+        cv.dilate(thresh, thresh, kernel);
         kernel.delete();
         
         let cnts = new cv.MatVector(), hierarchy = new cv.Mat();
-        
-        // KUNCI KEDUA: Menggunakan RETR_LIST (bukan EXTERNAL).
-        // Memungkinkan algoritma menembus batas kertas asli dan mencari kontur berbingkai di dalamnya.
+        // MENGGUNAKAN RETR_LIST: Cari SEMUA kontur tanpa terkecuali, diabaikan apakah dia ada di pinggir meja atau di dalam.
         cv.findContours(thresh, cnts, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-        let maxArea = 0, bestPts = null;
-        let imgArea = src.cols * src.rows;
+        let maxArea = 0, bestPts = null, imgArea = procMat.cols * procMat.rows;
 
         for (let i = 0; i < cnts.size(); ++i) {
             let c = cnts.get(i), area = cv.contourArea(c);
             
-            // Rentang toleransi luas batas LJK: 15% hingga 95% dari layar kamera
-            if (area > (imgArea * 0.15) && area < (imgArea * 0.95)) {
+            // Garis pembatas (Frame cetak LJK) ukurannya pasti mendominasi LJK (minimal 15% dari layar)
+            if (area > (imgArea * 0.15) && area < (imgArea * 0.98)) {
                 let approx = new cv.Mat();
-                // Presisi penelusuran lekukan ditingkatkan (0.02)
+                // Epsilon ketat: Memastikan kontur yang dipilih BENAR-BENAR berbentuk SEGI EMPAT LURUS (bukan acak)
                 cv.approxPolyDP(c, approx, 0.02 * cv.arcLength(c, true), true);
-
+                
                 if (approx.rows === 4) {
                     let pts = [];
-                    for(let j=0; j<4; j++) pts.push({x: approx.data32S[j*2], y: approx.data32S[j*2+1]});
+                    for(let j=0; j<4; j++) {
+                        pts.push({ 
+                            x: Math.round(approx.data32S[j*2] / scaleRatio), 
+                            y: Math.round(approx.data32S[j*2+1] / scaleRatio) 
+                        });
+                    }
                     
                     let d1 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
                     let d2 = Math.hypot(pts[1].x - pts[2].x, pts[1].y - pts[2].y);
                     let aspect = Math.max(d1, d2) / (Math.min(d1, d2) || 1);
-
-                    // Memastikan rasio bentuk mirip A4 vertikal/landscape (1.1 hingga 1.8)
-                    if (aspect >= 1.1 && aspect <= 1.8 && area > maxArea) {
-                        maxArea = area; bestPts = pts;
+                    
+                    // Rentang rasio kotak hitam cetakan LJK A4/F4 (Vertikal maupun Horizontal)
+                    if (aspect >= 1.1 && aspect <= 2.2 && area > maxArea) { 
+                        maxArea = area; bestPts = pts; 
                     }
                 } approx.delete();
             }
         }
-        gray.delete(); blur.delete(); thresh.delete(); cnts.delete(); hierarchy.delete();
+        
+        procMat.delete(); gray.delete(); blur.delete(); thresh.delete(); cnts.delete(); hierarchy.delete();
         if(!bestPts) return null;
 
-        bestPts.sort((a, b) => a.y - b.y);
-        let top = bestPts.slice(0, 2).sort((a, b) => a.x - b.x);
-        let bottom = bestPts.slice(2, 4).sort((a, b) => a.x - b.x);
-        return [top[0], top[1], bottom[1], bottom[0]]; 
+        // Sorting Sudut: Kiri Atas -> Kanan Atas -> Kanan Bawah -> Kiri Bawah
+        let sum = bestPts.map(p => p.x + p.y), diff = bestPts.map(p => p.y - p.x);
+        let tl = bestPts[sum.indexOf(Math.min(...sum))], br = bestPts[sum.indexOf(Math.max(...sum))];
+        let tr = bestPts[diff.indexOf(Math.min(...diff))], bl = bestPts[diff.indexOf(Math.max(...diff))];
+        return [tl, tr, br, bl];
     }
 
+    let lastProcessTime = 0;
     function startStreamLoop() {
         if (videoScanLoop) cancelAnimationFrame(videoScanLoop);
-        function loop() {
+        function loop(timestamp) {
             if (!video.paused && !video.ended) {
                 if (video.videoWidth === 0) { videoScanLoop = requestAnimationFrame(loop); return; }
+                if (timestamp - lastProcessTime < 100) { videoScanLoop = requestAnimationFrame(loop); return; }
+                lastProcessTime = timestamp;
                 try {
                     hiddenCanvas.getContext('2d').drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
                     let mat = cv.imread(hiddenCanvas);
                     let paperPts = getPaperContour(mat); 
-                    
                     let ctx = overlayCanvas.getContext('2d');
                     ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
                     if (paperPts) {
+                        trackerLostFrames = 0; 
                         let frame = { tl: paperPts[0], tr: paperPts[1], br: paperPts[2], bl: paperPts[3] };
                         if (!smoothedMarkers) { smoothedMarkers = frame; autoCaptureLockCount = 0; } 
                         else {
-                            ['tl', 'tr', 'br', 'bl'].forEach(k => {
-                                smoothedMarkers[k].x = smoothedMarkers[k].x * 0.7 + frame[k].x * 0.3;
-                                smoothedMarkers[k].y = smoothedMarkers[k].y * 0.7 + frame[k].y * 0.3;
-                            }); autoCaptureLockCount++;
+                            ['tl', 'tr', 'br', 'bl'].forEach(k => { smoothedMarkers[k].x = smoothedMarkers[k].x * 0.6 + frame[k].x * 0.4; smoothedMarkers[k].y = smoothedMarkers[k].y * 0.6 + frame[k].y * 0.4; });
+                            autoCaptureLockCount++;
                         }
-                        ctx.lineWidth = 4; ctx.strokeStyle = "#10b981"; ctx.beginPath(); 
-                        ctx.moveTo(smoothedMarkers.tl.x, smoothedMarkers.tl.y); ctx.lineTo(smoothedMarkers.tr.x, smoothedMarkers.tr.y); 
-                        ctx.lineTo(smoothedMarkers.br.x, smoothedMarkers.br.y); ctx.lineTo(smoothedMarkers.bl.x, smoothedMarkers.bl.y); 
-                        ctx.closePath(); ctx.stroke();
-                        scanStatus.innerHTML = `<span class='text-emerald-500 font-bold'>MENGUNCI KERTAS... (${Math.min(100, Math.round((autoCaptureLockCount/AUTO_CAPTURE_THRESHOLD)*100))}%)</span>`;
-                        
-                        if (autoCaptureLockCount >= AUTO_CAPTURE_THRESHOLD) {
-                            cancelAnimationFrame(videoScanLoop); mat.delete(); executeCapture(); return; 
-                        }
-                    } else { autoCaptureLockCount = 0; scanStatus.innerText = "Arahkan Kamera ke Batas Kertas LJK..."; }
-                    mat.delete();
+                    } else {
+                        trackerLostFrames++;
+                        if (trackerLostFrames > 5) { autoCaptureLockCount = 0; smoothedMarkers = null; scanStatus.innerText = "Mencari Garis Pembatas LJK..."; }
+                    }
+
+                    if (smoothedMarkers) {
+                        let tl = smoothedMarkers.tl, tr = smoothedMarkers.tr, br = smoothedMarkers.br, bl = smoothedMarkers.bl;
+                        ctx.lineWidth = 4; ctx.strokeStyle = "#10b981"; ctx.beginPath(); ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y); ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y); ctx.closePath(); ctx.stroke();
+                        scanStatus.innerHTML = `<span class='text-emerald-500 font-bold'>MENGUNCI GARIS... (${Math.min(100, Math.round((autoCaptureLockCount/AUTO_CAPTURE_THRESHOLD)*100))}%)</span>`;
+                        if (autoCaptureLockCount >= AUTO_CAPTURE_THRESHOLD) { cancelAnimationFrame(videoScanLoop); mat.delete(); executeCapture(false); return; }
+                    } mat.delete();
                 } catch (err) {}
                 videoScanLoop = requestAnimationFrame(loop);
             }
-        } loop();
+        } loop(0);
     }
 
-    function executeCapture() {
+    // --- PERBAIKAN: SINKRONISASI JEPRET MANUAL 2.0x (WYSIWYG 100%) ---
+    function executeCapture(isManual = false) {
         let captureCanvas = document.createElement('canvas');
-        captureCanvas.width = video.videoWidth; captureCanvas.height = video.videoHeight;
-        captureCanvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        let finalCanvas = captureCanvas; 
+        let exactPts = null;
+
+        if (isManual) {
+            // Perbesaran 2.0x Sinkron Universal:
+            // Mengambil area crop persis 50% dari tengah gambar sensor mentah (1920x1080 / 2)
+            // Ini menjamin hasil jepret manual tidak akan pernah meleset dari apa yang Bapak lihat.
+            let zoom = 2.0;
+            let sw = video.videoWidth / zoom;
+            let sh = video.videoHeight / zoom;
+            let sx = (video.videoWidth - sw) / 2;
+            let sy = (video.videoHeight - sh) / 2;
+
+            captureCanvas.width = sw; 
+            captureCanvas.height = sh;
+            captureCanvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+        } else {
+            captureCanvas.width = video.videoWidth; 
+            captureCanvas.height = video.videoHeight;
+            captureCanvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+            if (smoothedMarkers) {
+                let scaleX = video.videoWidth / hiddenCanvas.width, scaleY = video.videoHeight / hiddenCanvas.height;
+                exactPts = [
+                    {x: smoothedMarkers.tl.x * scaleX, y: smoothedMarkers.tl.y * scaleY},
+                    {x: smoothedMarkers.tr.x * scaleX, y: smoothedMarkers.tr.y * scaleY},
+                    {x: smoothedMarkers.br.x * scaleX, y: smoothedMarkers.br.y * scaleY},
+                    {x: smoothedMarkers.bl.x * scaleX, y: smoothedMarkers.bl.y * scaleY}
+                ];
+            }
+        }
+        
         resetUI(); document.getElementById('loader-overlay').classList.remove('hidden');
-        setTimeout(() => processLJKPipeline(captureCanvas), 200);
+        setTimeout(() => processLJKPipeline(finalCanvas, exactPts, isManual), 200);
     }
 
-    // --- PIPELINE UTAMA: V24 (Ultra Optimized & Strict Edge Rejection) ---
-    function processLJKPipeline(canvas) {
-        let src = null, roughWarped = null, strictWarpedMat = null;
+    // --- PIPELINE OMNI-DIRECTIONAL ---
+    function processLJKPipeline(canvas, exactPts = null, isManual = false) {
+        let src = null, roughWarped = null, strictWarpedMat = null, debugMat = null; 
         try {
             src = cv.imread(canvas);
+            let paperPts = exactPts;
+            if (!paperPts) paperPts = getPaperContour(src); 
             
-            if (src.cols > src.rows) {
-                logAI("Foto Horizontal. Menegakkan LJK Otomatis...");
-                cv.rotate(src, src, cv.ROTATE_90_CLOCKWISE);
+            if (!paperPts && isManual) {
+                logAI("Batas LJK tidak ditemukan. Menerapkan tebakan potong penuh layar.");
+                let w = src.cols, h = src.rows;
+                paperPts = [ {x: 0, y: 0}, {x: w, y: 0}, {x: w, y: h}, {x: 0, y: h} ];
             }
+            if (!paperPts) throw new Error("Gagal mengenali garis pembatas cetakan LJK. Pastikan garis kotak masuk seluruhnya di layar.");
 
-            // 1. CROP DASAR KERTAS
-            let paperPts = getPaperContour(src);
+            let d1 = Math.hypot(paperPts[0].x - paperPts[1].x, paperPts[0].y - paperPts[1].y);
+            let d2 = Math.hypot(paperPts[1].x - paperPts[2].x, paperPts[1].y - paperPts[2].y);
+            let d3 = Math.hypot(paperPts[2].x - paperPts[3].x, paperPts[2].y - paperPts[3].y);
+            let d4 = Math.hypot(paperPts[3].x - paperPts[0].x, paperPts[3].y - paperPts[0].y);
+            
+            let pW = (d1 + d3) / 2.0, pH = (d2 + d4) / 2.0;
+            let isLandscape = pW > pH;
+            let dynamicRatio = isLandscape ? (pW / pH) : (pH / pW);
+            dynamicRatio = Math.max(1.2, Math.min(dynamicRatio, 2.2));
+
+            let ROUGH_W = 1200, ROUGH_H = Math.round(ROUGH_W * dynamicRatio); 
+            let srcPtsMat = cv.matFromArray(4, 1, cv.CV_32FC2, [paperPts[0].x, paperPts[0].y, paperPts[1].x, paperPts[1].y, paperPts[2].x, paperPts[2].y, paperPts[3].x, paperPts[3].y]);
+            let dstArray = isLandscape ? [ ROUGH_W, 0, ROUGH_W, ROUGH_H, 0, ROUGH_H, 0, 0 ] : [ 0, 0, ROUGH_W, 0, ROUGH_W, ROUGH_H, 0, ROUGH_H ];
+            let dstPtsMat = cv.matFromArray(4, 1, cv.CV_32FC2, dstArray);
+
             roughWarped = new cv.Mat();
-            let ROUGH_W = 1200, ROUGH_H = 1710; 
+            let M = cv.getPerspectiveTransform(srcPtsMat, dstPtsMat);
+            cv.warpPerspective(src, roughWarped, M, new cv.Size(ROUGH_W, ROUGH_H));
+            srcPtsMat.delete(); dstPtsMat.delete(); M.delete();
 
-            if (paperPts) {
-                logAI("Batas frame LJK ditemukan. Memotong gambar dasar...");
-                let srcPtsMat = cv.matFromArray(4, 1, cv.CV_32FC2, [paperPts[0].x, paperPts[0].y, paperPts[1].x, paperPts[1].y, paperPts[2].x, paperPts[2].y, paperPts[3].x, paperPts[3].y]);
-                let dstPtsMat = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, ROUGH_W, 0, ROUGH_W, ROUGH_H, 0, ROUGH_H]);
-                let M = cv.getPerspectiveTransform(srcPtsMat, dstPtsMat);
-                cv.warpPerspective(src, roughWarped, M, new cv.Size(ROUGH_W, ROUGH_H));
-                srcPtsMat.delete(); dstPtsMat.delete(); M.delete();
-            } else {
-                logAI("Garis batas tak terlihat (mode mepet). Menyesuaikan skala...");
-                let scale = ROUGH_W / src.cols;
-                ROUGH_H = Math.round(src.rows * scale);
-                cv.resize(src, roughWarped, new cv.Size(ROUGH_W, ROUGH_H));
-            }
+            debugMat = new cv.Mat();
+            if (roughWarped.channels() === 4) cv.cvtColor(roughWarped, debugMat, cv.COLOR_RGBA2RGB); else roughWarped.copyTo(debugMat);
 
-            // 2. ADAPTIVE THRESHOLD FIRST (Menghilangkan bayangan dan silau merata)
-            logAI("Menyeimbangkan pencahayaan lokal...");
+            logAI("Melacak Titik Kalibrasi (Fiducial)...");
             let gray = new cv.Mat(), thresh = new cv.Mat();
             cv.cvtColor(roughWarped, gray, cv.COLOR_RGBA2GRAY, 0);
             cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 15);
-            gray.delete();
+            
+            let maskMarginW = Math.floor(ROUGH_W * 0.12), maskMarginH = Math.floor(ROUGH_H * 0.02);
+            let roiCenter = thresh.roi(new cv.Rect(maskMarginW, maskMarginH, ROUGH_W - (2 * maskMarginW), ROUGH_H - (2 * maskMarginH)));
+            roiCenter.setTo(new cv.Scalar(0)); roiCenter.delete();
+            
+            let roiTop = thresh.roi(new cv.Rect(0, 0, ROUGH_W, maskMarginH)); roiTop.setTo(new cv.Scalar(0)); roiTop.delete();
+            let roiBot = thresh.roi(new cv.Rect(0, ROUGH_H - maskMarginH, ROUGH_W, maskMarginH)); roiBot.setTo(new cv.Scalar(0)); roiBot.delete();
 
-            // 3. WIDE ZONE MASKING (Menyisakan 12% ujung tepi kiri dan kanan)
-            // Diperlebar dari 8% ke 12% untuk mengantisipasi margin putih yang lebar antara garis tepi & fiducial
-            let maskLeft = ROUGH_W * 0.12;
-            let maskRight = ROUGH_W * 0.88;
-            let centerRect = new cv.Rect(Math.floor(maskLeft), 0, Math.floor(maskRight - maskLeft), ROUGH_H);
-            let roi = thresh.roi(centerRect);
-            roi.setTo(new cv.Scalar(0)); // Dihitamkan agar tidak diproses
-            roi.delete();
-
-            // 4. MORPHOLOGICAL CLEANUP (Menambal kotak fiducial yang berlubang/kropos kena silau)
             let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
-            cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel);  
-            cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel); 
-            kernel.delete();
+            cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel); cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel); kernel.delete();
 
-            // 5. SINGLE-PASS CONTOUR SCAN DENGAN PENOLAKAN TEPI BINGKAI HITAM
             let contours = new cv.MatVector(), hierarchy = new cv.Mat();
             cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-            let leftBoxes = [], rightBoxes = [];
-            // Batas penolakan ujung dipertipis menjadi 5 pixel agar fiducial yang mepet tidak terbuang
-            let EDGE_MARGIN = 5; 
-
+            let leftBoxes = [], rightBoxes = [], EDGE_MARGIN = 15;
             for (let i = 0; i < contours.size(); ++i) {
-                let cnt = contours.get(i);
-                let area = cv.contourArea(cnt);
-                
-                // FILTER UKURAN: Minimal 400px! (Bulatan LJK ~225px, Fiducial Asli ~900px)
-                if (area > 400 && area < 4000) {
+                let cnt = contours.get(i), area = cv.contourArea(cnt);
+                if (area > 200 && area < 8000) {
                     let rect = cv.boundingRect(cnt);
-                    
-                    // ANTI-STRESS TEST: Buang garis yang langsung menyentuh 5 piksel ujung layar
-                    if (rect.x < EDGE_MARGIN || rect.y < EDGE_MARGIN || 
-                        rect.x + rect.width > ROUGH_W - EDGE_MARGIN || 
-                        rect.y + rect.height > ROUGH_H - EDGE_MARGIN) {
-                        continue; 
-                    }
-
-                    let aspect = rect.width / rect.height;
-                    let extent = area / (rect.width * rect.height);
-                    
-                    // Filter Bentuk Persegi Padat yang ketat (Toleransi rasio 0.7 - 1.3)
-                    if (aspect > 0.7 && aspect < 1.3 && extent > 0.75) {
-                        let cx = rect.x + rect.width / 2;
-                        let cy = rect.y + rect.height / 2;
-                        if (cx < maskLeft) leftBoxes.push({x: cx, y: cy, area: area});
-                        else if (cx > maskRight) rightBoxes.push({x: cx, y: cy, area: area});
+                    if (rect.x < EDGE_MARGIN || rect.y < EDGE_MARGIN || rect.x + rect.width > ROUGH_W - EDGE_MARGIN || rect.y + rect.height > ROUGH_H - EDGE_MARGIN) continue; 
+                    let aspect = rect.width / rect.height, extent = area / (rect.width * rect.height);
+                    if (aspect > 0.4 && aspect < 2.5 && extent > 0.4) {
+                        let cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2;
+                        if (cx < maskMarginW) leftBoxes.push({x: cx, y: cy, area: area}); 
+                        else if (cx > ROUGH_W - maskMarginW) rightBoxes.push({x: cx, y: cy, area: area});
                     }
                 }
             }
-            thresh.delete(); contours.delete(); hierarchy.delete();
+            gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
 
-            // Mengambil tepat 3 kotak paling meyakinkan (berdasarkan luas) per sisi
-            leftBoxes.sort((a,b) => b.area - a.area);
-            rightBoxes.sort((a,b) => b.area - a.area);
-            
-            let leftSide = leftBoxes.slice(0, 3).sort((a,b) => a.y - b.y);
-            let rightSide = rightBoxes.slice(0, 3).sort((a,b) => a.y - b.y);
+            leftBoxes.sort((a,b) => b.area - a.area); rightBoxes.sort((a,b) => b.area - a.area);
+            let leftSide = leftBoxes.slice(0, 3).sort((a,b) => a.y - b.y), rightSide = rightBoxes.slice(0, 3).sort((a,b) => a.y - b.y);
 
             if (leftSide.length < 3 || rightSide.length < 3) {
-                throw new Error(`Gagal membaca 6 kotak fiducial penuh (Kiri: ${leftSide.length}, Kanan: ${rightSide.length}). Pastikan garis hitam fiducial tidak tertutup bayangan tebal.`);
+                cv.imshow('result-canvas', debugMat); document.getElementById('result-canvas').style.display = 'block'; document.getElementById('result-canvas').classList.remove('hidden');
+                document.getElementById('loader-overlay').classList.add('hidden');
+                throw new Error(`Fiducial Gagal (Kiri: ${leftSide.length}, Kanan: ${rightSide.length}). Pastikan sudut kotak hitam pembatas tidak terpotong saat memotret.`);
             }
 
-            logAI(`Deteksi sempurna 6 Fiducial. Menganalisis orientasi...`);
-
-            // 6. ORIENTASI MATEMATIS (Center of Mass Jarak)
             let TL, ML, BL, TR, MR, BR;
             let distTopMid = (leftSide[1].y - leftSide[0].y) + (rightSide[1].y - rightSide[0].y);
             let distMidBot = (leftSide[2].y - leftSide[1].y) + (rightSide[2].y - rightSide[1].y);
 
-            if (distTopMid < distMidBot) {
-                logAI("Kertas Terbalik (Titik tengah menjauh dari bawah). Membalik sumbu...");
-                TL = rightSide[2]; ML = rightSide[1]; BL = rightSide[0];
-                TR = leftSide[2];  MR = leftSide[1];  BR = leftSide[0];
-            } else {
-                logAI("Orientasi benar (Titik tengah dekat dengan bawah).");
-                TL = leftSide[0];  ML = leftSide[1];  BL = leftSide[2];
-                TR = rightSide[0]; MR = rightSide[1]; BR = rightSide[2];
-            }
+            if (distTopMid < distMidBot) { TL = rightSide[2]; ML = rightSide[1]; BL = rightSide[0]; TR = leftSide[2]; MR = leftSide[1]; BR = leftSide[0]; } 
+            else { TL = leftSide[0]; ML = leftSide[1]; BL = leftSide[2]; TR = rightSide[0]; MR = rightSide[1]; BR = rightSide[2]; }
 
-            // 7. PIECEWISE DUAL-WARP (Kunci Tengah Bebas Distorsi)
-            logAI("Dual-Warp: Mencegah gambar melebar/distorsi di bagian tengah...");
             strictWarpedMat = new cv.Mat.zeros(FIDUCIAL_WARP_H, FIDUCIAL_WARP_W, cv.CV_8UC4);
-            
-            let ratioL = Math.hypot(TL.x - ML.x, TL.y - ML.y) / Math.hypot(TL.x - BL.x, TL.y - BL.y);
-            let ratioR = Math.hypot(TR.x - MR.x, TR.y - MR.y) / Math.hypot(TR.x - BR.x, TR.y - BR.y);
-            let targetMidY = Math.round(FIDUCIAL_WARP_H * ((ratioL + ratioR) / 2));
+            let targetMidY = Math.round(FIDUCIAL_WARP_H * ((Math.hypot(TL.x-ML.x, TL.y-ML.y)/Math.hypot(TL.x-BL.x, TL.y-BL.y) + Math.hypot(TR.x-MR.x, TR.y-MR.y)/Math.hypot(TR.x-BR.x, TR.y-BR.y)) / 2));
 
-            // WARP ATAS
             let srcPtsTop = cv.matFromArray(4, 1, cv.CV_32FC2, [TL.x, TL.y, TR.x, TR.y, MR.x, MR.y, ML.x, ML.y]);
             let dstPtsTop = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, FIDUCIAL_WARP_W, 0, FIDUCIAL_WARP_W, targetMidY, 0, targetMidY]);
-            let M_top = cv.getPerspectiveTransform(srcPtsTop, dstPtsTop);
-            let topWarped = new cv.Mat();
-            cv.warpPerspective(roughWarped, topWarped, M_top, new cv.Size(FIDUCIAL_WARP_W, targetMidY), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255,255,255,255));
-            let topRoi = strictWarpedMat.roi(new cv.Rect(0, 0, FIDUCIAL_WARP_W, targetMidY));
-            topWarped.copyTo(topRoi);
+            let M_top = cv.getPerspectiveTransform(srcPtsTop, dstPtsTop), topWarped = new cv.Mat();
+            cv.warpPerspective(roughWarped, topWarped, M_top, new cv.Size(FIDUCIAL_WARP_W, targetMidY));
+            let topRoi = strictWarpedMat.roi(new cv.Rect(0, 0, FIDUCIAL_WARP_W, targetMidY)); topWarped.copyTo(topRoi);
             topRoi.delete(); topWarped.delete(); M_top.delete(); srcPtsTop.delete(); dstPtsTop.delete();
 
-            // WARP BAWAH
             let botH = FIDUCIAL_WARP_H - targetMidY;
             let srcPtsBot = cv.matFromArray(4, 1, cv.CV_32FC2, [ML.x, ML.y, MR.x, MR.y, BR.x, BR.y, BL.x, BL.y]);
             let dstPtsBot = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, FIDUCIAL_WARP_W, 0, FIDUCIAL_WARP_W, botH, 0, botH]);
-            let M_bot = cv.getPerspectiveTransform(srcPtsBot, dstPtsBot);
-            let botWarped = new cv.Mat();
-            cv.warpPerspective(roughWarped, botWarped, M_bot, new cv.Size(FIDUCIAL_WARP_W, botH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255,255,255,255));
-            let botRoi = strictWarpedMat.roi(new cv.Rect(0, targetMidY, FIDUCIAL_WARP_W, botH));
-            botWarped.copyTo(botRoi);
+            let M_bot = cv.getPerspectiveTransform(srcPtsBot, dstPtsBot), botWarped = new cv.Mat();
+            cv.warpPerspective(roughWarped, botWarped, M_bot, new cv.Size(FIDUCIAL_WARP_W, botH));
+            let botRoi = strictWarpedMat.roi(new cv.Rect(0, targetMidY, FIDUCIAL_WARP_W, botH)); botWarped.copyTo(botRoi);
             botRoi.delete(); botWarped.delete(); M_bot.delete(); srcPtsBot.delete(); dstPtsBot.delete();
 
-            resultCanvas.width = FIDUCIAL_WARP_W; resultCanvas.height = FIDUCIAL_WARP_H;
-            resultCanvas.style.display = 'block'; resultCanvas.classList.remove('hidden');
-
-            logAI("Menilai Lembar Jawab OMR...");
+            document.getElementById('result-canvas').width = FIDUCIAL_WARP_W; document.getElementById('result-canvas').height = FIDUCIAL_WARP_H;
+            document.getElementById('result-canvas').style.display = 'block'; document.getElementById('result-canvas').classList.remove('hidden');
             extractOMRData(strictWarpedMat, true);
-
         } catch (err) {
-            logAI(err.message, true);
-            console.error(err);
-            document.getElementById('placeholder-text').classList.remove('hidden');
-            document.getElementById('loader-overlay').classList.add('hidden');
-            resetUI();
+            logAI(err.message, true); showCustomAlert(err.message); document.getElementById('loader-overlay').classList.add('hidden');
         } finally { 
-            if(src) src.delete(); 
-            if(roughWarped) roughWarped.delete();
-            if(strictWarpedMat) strictWarpedMat.delete();
+            if(src) src.delete(); if(roughWarped) roughWarped.delete(); if(strictWarpedMat) strictWarpedMat.delete(); if(debugMat) debugMat.delete(); 
         }
     }
 
-    // STEP 8: OMR SCORING
+    // --- EVALUASI JAWABAN (AKURASI MURNI) ---
     function extractOMRData(warpedMat, isNewScan = false) {
         cv.imshow('result-canvas', warpedMat);
         let ctx = resultCanvas.getContext('2d');
-
-        ctx.strokeStyle = "rgba(239, 68, 68, 0.3)"; ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.2)"; ctx.lineWidth = 1;
         for(let r = 0; r <= GRID_ROWS; r++) { ctx.beginPath(); ctx.moveTo(START_X, START_Y + r * GRID_SIZE); ctx.lineTo(START_X + (GRID_COLS * GRID_SIZE), START_Y + r * GRID_SIZE); ctx.stroke(); }
         for(let c = 0; c <= GRID_COLS; c++) { ctx.beginPath(); ctx.moveTo(START_X + c * GRID_SIZE, START_Y); ctx.lineTo(START_X + c * GRID_SIZE, START_Y + (GRID_ROWS * GRID_SIZE)); ctx.stroke(); }
 
@@ -529,84 +584,54 @@
         cv.cvtColor(warpedMat, gray, cv.COLOR_RGBA2GRAY, 0);
         cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
         cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 81, 18);
-
-        let M_kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
-        cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, M_kernel); M_kernel.delete();
+        let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+        cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel); kernel.delete();
 
         let gridData = [];
         for(let r=0; r<GRID_ROWS; r++) {
             gridData[r] = [];
             for(let c=0; c<GRID_COLS; c++) {
-                let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
-                let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                let coreSize = Math.floor(GRID_SIZE * 0.50); 
-                
-                let rect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
-                let roi = thresh.roi(rect);
-                gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy };
-                roi.delete();
+                let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2), cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2), coreSize = Math.floor(GRID_SIZE * 0.50); 
+                let roi = thresh.roi(new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize));
+                gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy }; roi.delete();
             }
         }
-
+        
         let name = extractIdentity(gridData, MATRIX_MAP.name, ALPHABET, ctx);
         let kelas = extractIdentity(gridData, MATRIX_MAP.kelas, KELAS_VALS, ctx);
         let absen = extractIdentity(gridData, MATRIX_MAP.absen, NUMBERS, ctx);
-        const answerKey = document.getElementById('answer-key').value.toUpperCase().replace(/[^A-D]/g, '');
-        let scoreData = gradeAnswers(gridData, ctx, answerKey);
+        const key = document.getElementById('answer-key').value.toUpperCase().replace(/[^A-D]/g, '');
+        let scoreData = gradeAnswers(gridData, ctx, key);
 
         if(isNewScan) {
             let existingIndex = resultData.findIndex(d => d.absen === absen && d.kelas === kelas);
             let dataRow = { name, kelas, absen, ...scoreData };
-
-            if (existingIndex !== -1) {
-                dataRow.id = resultData[existingIndex].id;
-                showPopupResult(dataRow, true, existingIndex);
-            } else {
-                dataRow.id = scanCounter++;
-                resultData.push(dataRow);
-                showPopupResult(dataRow, false);
-                updateTable();
-            }
+            if (existingIndex !== -1) { dataRow.id = resultData[existingIndex].id; showPopupResult(dataRow, true, existingIndex); } 
+            else { dataRow.id = scanCounter++; resultData.push(dataRow); showPopupResult(dataRow, false); updateTable(); }
         } else { updateTable(); }
-        
         document.getElementById('loader-overlay').classList.add('hidden');
         gray.delete(); thresh.delete();
     }
 
     function evaluateCellGroup(opts, ctx, keyChar = null) {
         let sortedOpts = [...opts].sort((a,b) => b.d - a.d);
-        let best = sortedOpts[0], second = sortedOpts[1];
-        let selected = keyChar === null ? ' ' : '-'; 
-        let isError = false;
-
-        let backgroundNoise = 0, noiseSamples = 0;
-        for(let i = Math.max(1, Math.floor(sortedOpts.length / 2)); i < sortedOpts.length; i++) {
-            backgroundNoise += sortedOpts[i].d;
-            noiseSamples++;
-        }
-        backgroundNoise = noiseSamples > 0 ? (backgroundNoise / noiseSamples) : 0;
-        let effectiveNoise = Math.max(backgroundNoise, best ? best.area * 0.02 : 1);
-
-        let fillRatio = best ? (best.d / best.area) : 0;
-        let secondFillRatio = second ? (second.d / second.area) : 0;
-
+        let best = sortedOpts[0], second = sortedOpts[1], selected = keyChar === null ? ' ' : '-', isError = false;
+        let bgNoise = 0, noiseSamples = 0;
+        for(let i = Math.max(1, Math.floor(sortedOpts.length / 2)); i < sortedOpts.length; i++) { bgNoise += sortedOpts[i].d; noiseSamples++; }
+        let effectiveNoise = Math.max(noiseSamples > 0 ? (bgNoise / noiseSamples) : 0, best ? best.area * 0.02 : 1);
+        let fillRatio = best ? (best.d / best.area) : 0, secondFillRatio = second ? (second.d / second.area) : 0;
         if (best && fillRatio >= 0.15 && (best.d / effectiveNoise) >= 3.0) {
-            if (second && second.d >= best.d * 0.65 && secondFillRatio >= 0.10) { 
-                isError = true; selected = '*'; 
-            } else { selected = best.v; }
+            if (second && second.d >= best.d * 0.65 && secondFillRatio >= 0.10) { isError = true; selected = '*'; } else { selected = best.v; }
         }
-
         if (keyChar !== null) {
             let keyOpt = opts.find(o => o.v === keyChar);
             if (keyOpt) { ctx.beginPath(); ctx.arc(keyOpt.cx, keyOpt.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#10b981"; ctx.fill(); }
         }
-
         if (best && fillRatio >= 0.15 && (best.d / effectiveNoise) >= 3.0) {
             ctx.beginPath(); ctx.arc(best.cx, best.cy, 14, 0, 2 * Math.PI); ctx.lineWidth = 3;
             if (keyChar !== null) { ctx.strokeStyle = (best.v === keyChar && !isError) ? "#10b981" : "#ef4444"; } 
             else { ctx.strokeStyle = "#3b82f6"; ctx.stroke(); ctx.beginPath(); ctx.arc(best.cx, best.cy, 6, 0, 2 * Math.PI); ctx.fillStyle = "#3b82f6"; ctx.fill(); }
             ctx.stroke();
-
             if (isError && second) {
                 ctx.beginPath(); ctx.arc(second.cx, second.cy, 14, 0, 2 * Math.PI); ctx.lineWidth = 3;
                 ctx.strokeStyle = keyChar !== null ? "#ef4444" : "#3b82f6"; ctx.stroke();
@@ -622,6 +647,7 @@
             let col = map.c + c, opts = [];
             for(let r=0; r<map.h; r++) {
                 let cell = grid[map.r + map.skipRow + r][col];
+                // BUG FIXED: cy: cy dirubah menjadi cy: cell.cy
                 opts.push({ v: vals[r] || '', d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy });
             } res.push(evaluateCellGroup(opts, ctx, null));
         } return res.join('').trim() || "-";
@@ -643,9 +669,9 @@
         let trueCount = answers.filter((a,i) => a === key[i]).length;
         let falseCount = answers.filter((a,i) => a !== '-' && a !== '*' && a !== key[i]).length;
         let emptyCount = answers.filter(a => a === '-' || a === '*').length;
-        let correctNumbersArray = [], wrongNumbersArray = [];
-        answers.forEach((a, i) => { if(a === key[i]) correctNumbersArray.push(i + 1); else if(a !== '-' && a !== '*') wrongNumbersArray.push(i + 1); });
-        return { trueCount, falseCount, emptyCount, answers, correctNumbers: correctNumbersArray, wrongNumbers: wrongNumbersArray };
+        let correctNumbers = [], wrongNumbers = [];
+        answers.forEach((a, i) => { if(a === key[i]) correctNumbers.push(i + 1); else if(a !== '-' && a !== '*') wrongNumbers.push(i + 1); });
+        return { trueCount, falseCount, emptyCount, answers, correctNumbers, wrongNumbers };
     }
 
     function updateTable() {
@@ -654,7 +680,7 @@
             let tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 border-b border-slate-100 text-sm transition-colors";
             tr.innerHTML = `
                 <td class="p-4 text-center">
-                    <button class="btn-delete text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition" data-id="${d.id}" title="Hapus Data">
+                    <button class="btn-delete text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition" data-id="${d.id}">
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </td>
@@ -664,51 +690,47 @@
                 <td class="p-4">${d.absen}</td>
                 <td class="p-4 text-emerald-600 font-bold">${d.trueCount}</td>
                 <td class="p-4 text-red-600 font-bold">${d.falseCount}</td>
-                <td class="p-4 text-slate-600 font-bold bg-slate-50/50">${d.emptyCount}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px] leading-relaxed">${d.correctNumbers.join(', ')}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px] leading-relaxed">${d.wrongNumbers.join(', ')}</td>
-                <td class="p-4 text-slate-800 font-mono text-xs tracking-widest bg-slate-50">${d.answers.join('')}</td>
+                <td class="p-4 text-slate-600 font-bold">${d.emptyCount}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.correctNumbers.join(', ')}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.wrongNumbers.join(', ')}</td>
+                <td class="p-4 text-slate-800 font-mono text-xs tracking-widest">${d.answers.join('')}</td>
             `; tbody.appendChild(tr);
         });
     }
 
-    document.getElementById('result-table-body').addEventListener('click', function(e) {
-        let btn = e.target.closest('.btn-delete');
-        if (!btn) return;
-        let id = parseInt(btn.getAttribute('data-id'));
-        if(confirm("Apakah Anda yakin ingin menghapus data siswa ini?")) {
-            resultData = resultData.filter(d => d.id !== id);
-            updateTable(); logAI(`Data ID ${id} berhasil dihapus dari tabel.`);
-        }
+    document.getElementById('result-table-body').addEventListener('click', e => {
+        let btn = e.target.closest('.btn-delete'); if (btn) showDeleteConfirm(parseInt(btn.getAttribute('data-id'))); 
+    });
+
+    document.getElementById('btn-confirm-delete').addEventListener('click', () => {
+        if (pendingDeleteId !== null) { resultData = resultData.filter(d => d.id !== pendingDeleteId); updateTable(); closeModal('confirm-modal'); }
     });
 
     function showPopupResult(data, isDuplicate = false, index = -1) {
         document.getElementById('modal-name').innerText = data.name;
         document.getElementById('modal-kelas-absen').innerText = `${data.kelas} / ${data.absen}`;
         document.getElementById('modal-benar').innerText = data.trueCount; 
+        document.getElementById('modal-salah').innerText = data.falseCount; 
+        document.getElementById('modal-kosong').innerText = data.emptyCount; 
         const actionsDiv = document.getElementById('modal-actions'); const modalTitle = document.getElementById('modal-title');
         actionsDiv.innerHTML = '';
         if (isDuplicate) {
             pendingUpdateData = data; pendingUpdateIndex = index;
             modalTitle.innerText = "Peringatan: Data Sudah Ada!"; modalTitle.classList.replace('text-emerald-600', 'text-yellow-600');
-            let btnCancel = document.createElement('button'); btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition"; btnCancel.innerText = "Batal (Abaikan)"; btnCancel.addEventListener('click', closeModal);
-            let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition shadow-md flex-1"; btnUpdate.innerText = "Update Data (Timpa)";
-            btnUpdate.addEventListener('click', function() { if (pendingUpdateIndex !== -1 && pendingUpdateData) { resultData[pendingUpdateIndex] = pendingUpdateData; updateTable(); logAI(`Data Absen ${pendingUpdateData.absen} diperbarui.`); closeModal(); } });
+            let btnCancel = document.createElement('button'); btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition"; btnCancel.innerText = "Batal"; btnCancel.onclick = () => closeModal('result-modal');
+            let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition flex-1"; btnUpdate.innerText = "Update Data";
+            btnUpdate.onclick = () => { if (pendingUpdateIndex !== -1 && pendingUpdateData) { resultData[pendingUpdateIndex] = pendingUpdateData; updateTable(); closeModal('result-modal'); } };
             actionsDiv.appendChild(btnCancel); actionsDiv.appendChild(btnUpdate);
         } else {
             modalTitle.innerText = "Berhasil Dipindai!"; modalTitle.classList.replace('text-yellow-600', 'text-emerald-600');
-            let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 w-full text-center transition shadow-md"; btnClose.innerText = "Tutup & Lanjut"; btnClose.addEventListener('click', closeModal);
+            let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 w-full text-center transition shadow-md"; btnClose.innerText = "Tutup & Lanjut"; btnClose.onclick = () => closeModal('result-modal');
             actionsDiv.appendChild(btnClose);
-        }
-        document.getElementById('result-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active');
+        } openModal('result-modal');
     }
 
-    document.getElementById('btn-close-top').addEventListener('click', closeModal);
-    function closeModal() { document.getElementById('result-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); pendingUpdateData = null; pendingUpdateIndex = -1; }
-
     document.getElementById('btn-export').addEventListener('click', () => {
-        if (!resultData.length) return alert("Belum ada data nilai yang bisa didownload.");
-        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama Siswa": d.name, "Kelas": d.kelas, "No. Absen": d.absen, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Nomor Benar": d.correctNumbers.join(', '), "Detail Nomor Salah": d.wrongNumbers.join(', '), "Rekaman Jawaban LJK": d.answers.join('') })));
+        if (!resultData.length) return showCustomAlert("Belum ada data nilai.");
+        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama": d.name, "Kelas": d.kelas, "Absen": d.absen, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Benar": d.correctNumbers.join(', '), "Detail Salah": d.wrongNumbers.join(', '), "Jawaban": d.answers.join('') })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap LJK");
         XLSX.writeFile(wb, `Rekap_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
