@@ -26,7 +26,7 @@
     <header class="bg-slate-900 text-white rounded-xl p-6 shadow-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b-4 border-emerald-500">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-emerald-400">LJK Scanner Pro</h1>
-            <p class="text-sm text-slate-300 mt-1">v51.1 (Stability Lock & Anti-Camouflage BG)</p>
+            <p class="text-sm text-slate-300 mt-1">V51.0 (Hybrid Vision & Hardware Alignment)</p>
         </div>
         <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700">
             <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV Memuat...
@@ -37,12 +37,10 @@
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
                 <span>Status Sistem</span>
-                <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v51.1 STABLE</span>
+                <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v52.0 FINAL</span>
             </h2>
             <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-56 overflow-y-auto shadow-inner leading-relaxed" id="ai-log">
-                > Sistem Dimulai. Menunggu Instuksi.<br>
-                > Stabilizer Lock Aktif: Anti Jepret Prematur.<br>
-                > Anti-Camouflage (White Isolation) Aktif.<br>
+                > Sistem Dimulai. Menunggu Instuksi...<br>
             </div>
             <div>
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-2 text-slate-700 uppercase">Kunci Jawaban (N)</label>
@@ -59,7 +57,7 @@
                 <div id="placeholder-text" class="text-slate-400 text-sm font-medium text-center px-4 leading-relaxed absolute z-0">
                     <svg class="w-16 h-16 mx-auto mb-3 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"></path></svg>
                     Arahkan kamera ke LJK atau Upload Scan.<br>
-                    <span class="text-xs text-emerald-400">Pastikan LJK stabil di layar untuk Auto-Scan.</span>
+                    <span class="text-xs text-emerald-400">Sistem 4 Sudut Fokus Presisi</span>
                 </div>
                 <video id="video" playsinline autoplay muted class="hidden"></video>
                 <canvas id="overlay-canvas" class="hidden pointer-events-none"></canvas>
@@ -67,13 +65,12 @@
                 
                 <button id="btn-manual-capture" class="hidden absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-full font-black tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.4)] z-50 border-2 border-emerald-500 hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-3">
                     <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"></circle></svg>
-                    PINDAI MANUAL
                 </button>
 
                 <div id="loader-overlay" class="absolute inset-0 bg-slate-900/95 hidden flex-col justify-center items-center z-50 backdrop-blur-sm">
                     <div class="loader mb-4"></div>
                     <p id="loader-text" class="text-xs font-bold text-emerald-400 tracking-widest animate-pulse uppercase text-center leading-relaxed">
-                        Menganalisis LJK<br><span class="text-[9px] text-slate-400">Menetralkan Bayangan & Memotong...</span>
+                        Menganalisis LJK<br><span class="text-[9px] text-slate-400">Mencari Sumbu Tengah & Membelah Otomatis...</span>
                     </p>
                 </div>
             </div>
@@ -86,7 +83,7 @@
                 </button>
                 <label class="flex-1 bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-lg font-bold text-center cursor-pointer transition shadow-md flex justify-center items-center gap-2 text-sm sm:text-base">
                     <svg class="w-5 h-5 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    Upload Foto LJK
+                    Upload Foto
                     <input type="file" id="file-upload" accept="image/*" class="hidden">
                 </label>
             </div>
@@ -95,7 +92,7 @@
 
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-4 gap-4">
-            <h2 class="font-bold text-xl text-slate-800">Rekapitulasi Nilai LJK</h2>
+            <h2 class="font-bold text-xl text-slate-800">Rekapitulasi Nilai</h2>
             <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
                 Download Excel
             </button>
@@ -207,7 +204,7 @@
 
     let resultData = [], scanCounter = 1, smoothedMarkers = null, videoScanLoop = null;
     let autoCaptureLockCount = 0, trackerLostFrames = 0; 
-    const AUTO_CAPTURE_THRESHOLD = 12; // Dinaikkan menjadi 12 frame agar butuh kestabilan ekstra
+    const AUTO_CAPTURE_THRESHOLD = 15; // Ditingkatkan dari 8 ke 15 agar tidak prematur (lebih stabil)
     let pendingUpdateData = null, pendingUpdateIndex = -1, pendingDeleteId = null;
 
     const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas');
@@ -251,7 +248,7 @@
         resultCanvas.classList.add('hidden'); resultCanvas.style.display = 'none';
         overlayCanvas.getContext('2d').clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         video.classList.add('hidden'); overlayCanvas.classList.add('hidden'); 
-        document.getElementById('placeholder-text').classList.add('hidden');
+        document.getElementById('placeholder-text').classList.remove('hidden');
         document.getElementById('btn-manual-capture').classList.add('hidden');
         smoothedMarkers = null; autoCaptureLockCount = 0; trackerLostFrames = 0; 
         scanStatus.innerText = "Kamera Nonaktif";
@@ -371,7 +368,6 @@
         return bestPts ? orderPoints(bestPts) : null;
     }
 
-    // JALUR 2: SENJATA PAMUNGKAS (Upload & Manual)
     function findUploadManualContour(src, scanMode) {
         let procMat = new cv.Mat(), gray = new cv.Mat(), blur = new cv.Mat();
         let scaleRatio = 1000.0 / src.cols;
@@ -393,11 +389,8 @@
             let edges = new cv.Mat(), closed = new cv.Mat();
             let kernel1 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
             
-            if (scanMode === 'UPLOAD') {
-                cv.Canny(blur, edges, 30, 100);
-            } else {
-                cv.Canny(blur, edges, 20, 75);
-            }
+            if (scanMode === 'UPLOAD') cv.Canny(blur, edges, 30, 100);
+            else cv.Canny(blur, edges, 20, 75);
             
             cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel1);
             bestPts = findBestQuad(closed, scaleRatio, false, imgArea, cxCenter, cyCenter);
@@ -418,27 +411,12 @@
                 grad.delete(); kernel2.delete();
             }
 
-            // [SOLUSI MASALAH 3] ANTI-CAMOUFLAGE BACKGROUND (Pemisahan Intensitas Cahaya)
-            // Jika kertas ada di atas taplak meja bercorak, tepinya akan tersamarkan. 
-            // Kita potong berdasarkan terangnya kertas putih vs gelapnya meja.
-            if (!bestPts) {
-                let brightMask = new cv.Mat();
-                // Mengambil benda berwarna putih/terang (kertas)
-                cv.threshold(gray, brightMask, 140, 255, cv.THRESH_BINARY); 
-                let kernel3 = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-                // Menutup lubang-lubang hitam (tulisan) di dalam kertas putih
-                cv.morphologyEx(brightMask, brightMask, cv.MORPH_CLOSE, kernel3);
-                bestPts = findBestQuad(brightMask, scaleRatio, false, imgArea, cxCenter, cyCenter);
-                brightMask.delete(); kernel3.delete();
-            }
-
             if (!bestPts) {
                 let adThresh = new cv.Mat();
                 cv.adaptiveThreshold(blur, adThresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 61, 15);
                 bestPts = findBestQuad(adThresh, scaleRatio, false, imgArea, cxCenter, cyCenter);
                 adThresh.delete();
             }
-
         } finally {
             procMat.delete(); gray.delete(); blur.delete();
         }
@@ -447,13 +425,14 @@
     }
 
     // =================================================================================
-    // 5. KONTROL HARDWARE & EVENT LISTENER
+    // 5. KONTROL HARDWARE & EVENT LISTENER (KEMBALI KE 4 KOTAK KETAT)
     // =================================================================================
     
     document.getElementById('btn-camera').addEventListener('click', async () => {
         if (!validateKey()) return; 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showCustomAlert("Akses kamera tidak diizinkan."); return; }
         resetUI(); video.classList.remove('hidden'); overlayCanvas.classList.remove('hidden');
+        document.getElementById('placeholder-text').classList.add('hidden'); // Sembunyikan teks
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
@@ -473,7 +452,7 @@
 
     document.getElementById('btn-manual-capture').addEventListener('click', () => {
         if (!video.paused && !video.ended) {
-            logAI("Jepret Manual dipicu. Mengambil sensor mentah (seperti mode Upload)...");
+            logAI("Jepret Manual dipicu. Mengambil sensor mentah...");
             if (videoScanLoop) cancelAnimationFrame(videoScanLoop);
             executeCapture(true, null); 
         }
@@ -499,6 +478,37 @@
 
         function loop(timestamp) {
             if (!video.paused && !video.ended) {
+                // 1. GAMBAR UI 4 KOTAK PANDUAN SAJA (Fokus Sudut Luar LJK)
+                let ctx = overlayCanvas.getContext('2d');
+                let w = overlayCanvas.width;
+                let h = overlayCanvas.height;
+                ctx.clearRect(0, 0, w, h);
+
+                let paperH = h * 0.85; 
+                let paperW = paperH / 1.45; 
+                if (paperW > w * 0.9) {
+                    paperW = w * 0.9;
+                    paperH = paperW * 1.45;
+                }
+
+                let offsetX = (w - paperW) / 2;
+                let offsetY = (h - paperH) / 2;
+                let boxW = paperW * 0.12; 
+                let boxH = boxW; 
+
+                // HANYA 4 KOTAK SUDUT (Memudahkan User Experience)
+                const boxes = [
+                    { x: offsetX, y: offsetY }, // TL
+                    { x: offsetX + paperW - boxW, y: offsetY }, // TR
+                    { x: offsetX, y: offsetY + paperH - boxH }, // BL
+                    { x: offsetX + paperW - boxW, y: offsetY + paperH - boxH }  // BR
+                ];
+
+                ctx.strokeStyle = "rgba(16, 185, 129, 0.6)";
+                ctx.lineWidth = 4;
+                boxes.forEach(b => ctx.strokeRect(b.x, b.y, boxW, boxH));
+
+                // 2. PEMROSESAN OPENCV
                 if (video.videoWidth === 0 || timestamp - lastProcessTime < 60) { 
                     videoScanLoop = requestAnimationFrame(loop); return; 
                 }
@@ -507,55 +517,49 @@
                 try {
                     hiddenCanvas.getContext('2d').drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
                     let mat = cv.imread(hiddenCanvas);
-                    
                     let paperPts = findLiveTrackerContour(mat); 
-                    
-                    let ctx = overlayCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
                     if (paperPts) {
                         trackerLostFrames = 0; 
                         let frame = { tl: paperPts[0], tr: paperPts[1], br: paperPts[2], bl: paperPts[3] };
-                        
-                        if (!smoothedMarkers) { 
-                            smoothedMarkers = frame; 
-                            autoCaptureLockCount = 0; 
-                        } else {
-                            // [SOLUSI MASALAH 1] CEK STABILITAS (Motion Variance Check)
-                            // Menghitung pergerakan pixel dari frame ke frame. 
-                            let dist = Math.hypot(frame.tl.x - smoothedMarkers.tl.x, frame.tl.y - smoothedMarkers.tl.y) +
-                                       Math.hypot(frame.tr.x - smoothedMarkers.tr.x, frame.tr.y - smoothedMarkers.tr.y) +
-                                       Math.hypot(frame.br.x - smoothedMarkers.br.x, frame.br.y - smoothedMarkers.br.y) +
-                                       Math.hypot(frame.bl.x - smoothedMarkers.bl.x, frame.bl.y - smoothedMarkers.bl.y);
-
-                            if (dist > 35) {
-                                // Jika kamera goyang/objek bergerak, reset hitungan! (Anti Jepret Prematur)
-                                autoCaptureLockCount = 0;
-                                smoothedMarkers = frame;
-                            } else {
-                                // Kamera stabil, lanjutkan hitungan
-                                ['tl', 'tr', 'br', 'bl'].forEach(k => { 
-                                    smoothedMarkers[k].x = smoothedMarkers[k].x * 0.8 + frame[k].x * 0.2;
-                                    smoothedMarkers[k].y = smoothedMarkers[k].y * 0.8 + frame[k].y * 0.2; 
-                                });
-                                autoCaptureLockCount++;
-                            }
+                        if (!smoothedMarkers) { smoothedMarkers = frame; } 
+                        else {
+                            ['tl', 'tr', 'br', 'bl'].forEach(k => { 
+                                smoothedMarkers[k].x = smoothedMarkers[k].x * 0.7 + frame[k].x * 0.3;
+                                smoothedMarkers[k].y = smoothedMarkers[k].y * 0.7 + frame[k].y * 0.3; 
+                            });
                         }
                     } else {
                         trackerLostFrames++;
-                        if (trackerLostFrames > 5) { autoCaptureLockCount = 0; smoothedMarkers = null; scanStatus.innerHTML = "Arahkan & <span class='text-red-500 font-bold'>Tahan Tangan Anda</span>"; }
+                        if (trackerLostFrames > 5) { autoCaptureLockCount = 0; smoothedMarkers = null; scanStatus.innerText = "Arahkan LJK ke dalam 4 kotak..."; }
                     }
 
+                    // 3. LOGIKA ALIGNMENT YANG JAUH LEBIH KETAT
                     if (smoothedMarkers) {
                         let tl = smoothedMarkers.tl, tr = smoothedMarkers.tr, br = smoothedMarkers.br, bl = smoothedMarkers.bl;
-                        ctx.lineWidth = 4; 
-                        // Warna merah jika belum stabil, hijau jika sedang mengunci
-                        ctx.strokeStyle = autoCaptureLockCount > 2 ? "#10b981" : "#f59e0b"; 
-                        ctx.beginPath(); ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y); ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y); ctx.closePath(); ctx.stroke();
                         
-                        let progress = Math.min(100, Math.round((autoCaptureLockCount/AUTO_CAPTURE_THRESHOLD)*100));
-                        scanStatus.innerHTML = `<span class='${progress > 50 ? "text-emerald-500" : "text-yellow-500"} font-bold'>TAHAN DIAM... (${progress}%)</span>`;
-                        
+                        let alignedCount = 0;
+                        // TOLERANSI DIPERKETAT MENJADI 70% DARI UKURAN KOTAK (Sebelumnya 180%)
+                        const alignThreshold = boxW * 0.7; 
+
+                        if (Math.hypot(tl.x - (boxes[0].x + boxW/2), tl.y - (boxes[0].y + boxH/2)) < alignThreshold) alignedCount++;
+                        if (Math.hypot(tr.x - (boxes[1].x + boxW/2), tr.y - (boxes[1].y + boxH/2)) < alignThreshold) alignedCount++;
+                        // BL & BR indexnya disesuaikan karena array boxes sekarang hanya isi 4
+                        if (Math.hypot(bl.x - (boxes[2].x + boxW/2), bl.y - (boxes[2].y + boxH/2)) < alignThreshold) alignedCount++;
+                        if (Math.hypot(br.x - (boxes[3].x + boxW/2), br.y - (boxes[3].y + boxH/2)) < alignThreshold) alignedCount++;
+
+                        // WAJIB 4 SUDUT PAS (Tidak boleh kurang)
+                        if (alignedCount === 4) {
+                            autoCaptureLockCount++;
+                            ctx.strokeStyle = "#eab308"; 
+                            ctx.lineWidth = 6;
+                            boxes.forEach(b => ctx.strokeRect(b.x, b.y, boxW, boxH));
+                            scanStatus.innerHTML = `<span class='text-emerald-500 font-bold'>SEJAJAR! MENGUNCI... (${Math.min(100, Math.round((autoCaptureLockCount/AUTO_CAPTURE_THRESHOLD)*100))}%)</span>`;
+                        } else {
+                            autoCaptureLockCount = Math.max(0, autoCaptureLockCount - 1);
+                            scanStatus.innerHTML = `<span class='text-blue-500 font-bold'>Paskan 4 sudut LJK ke dalam kotak hijau</span>`;
+                        }
+
                         if (autoCaptureLockCount >= AUTO_CAPTURE_THRESHOLD) { 
                             let lockedMarkers = { ...smoothedMarkers };
                             cancelAnimationFrame(videoScanLoop); mat.delete(); executeCapture(false, lockedMarkers); return; 
@@ -610,7 +614,7 @@
     }
 
     // =================================================================================
-    // 6. PIPELINE FINAL: PEMOTONGAN & EKSTRAKSI NILAI
+    // 6. PIPELINE FINAL: PEMOTONGAN DUAL-WARP (ATAS & BAWAH)
     // =================================================================================
     function processLJKPipeline(canvas, exactPts = null, scanMode = 'UPLOAD') {
         let src = null, roughWarped = null, strictWarpedMat = null; 
@@ -626,14 +630,6 @@
                 paperPts = findUploadManualContour(src, scanMode); 
             }
             
-            // [SOLUSI MASALAH 2] SAFETY NET UNTUK AUTO-CROP YANG BERANTAKAN
-            // Jika Tracker Auto-Crop gagal menemukan bentuk yang valid/terdistorsi parah,
-            // mesin akan BERALIH (Fallback) menggunakan algoritma Upload pada frame tersebut.
-            if (!paperPts && scanMode === 'AUTO') {
-                logAI("Tracker Meleset. Mengalihkan ke Algoritma Upload...", true);
-                paperPts = findUploadManualContour(src, 'MANUAL');
-            }
-
             if (!paperPts) {
                 logAI("Garis LJK tak terlihat. Memproses Full-Frame (Layar Penuh)...", true);
                 paperPts = [ {x: 0, y: 0}, {x: src.cols, y: 0}, {x: src.cols, y: src.rows}, {x: 0, y: src.rows} ];
@@ -664,7 +660,7 @@
             cv.warpPerspective(src, roughWarped, M, new cv.Size(ROUGH_W, ROUGH_H));
             srcPtsMat.delete(); dstPtsMat.delete(); M.delete();
 
-            logAI("Melacak 6 Fiducial (Algoritma Tes Plus)...");
+            logAI("Mencari Titik Potong 6 Kotak Fiducial secara Otomatis...");
             let gray = new cv.Mat(), thresh = new cv.Mat();
             cv.cvtColor(roughWarped, gray, cv.COLOR_RGBA2GRAY, 0);
 
@@ -725,8 +721,12 @@
             else { TL = leftSide[0]; ML = leftSide[1]; BL = leftSide[2]; TR = rightSide[0]; MR = rightSide[1]; BR = rightSide[2]; }
 
             strictWarpedMat = new cv.Mat.zeros(FIDUCIAL_WARP_H, FIDUCIAL_WARP_W, cv.CV_8UC4);
+            
+            // LOGIKA DUAL-WARP: Membelah gambar tepat pada sumbu Fiducial Tengah-Samping
+            logAI("Membelah LJK (Dual-Warp) Pada Sumbu Tengah...");
             let targetMidY = Math.round(FIDUCIAL_WARP_H * ((Math.hypot(TL.x-ML.x, TL.y-ML.y)/Math.hypot(TL.x-BL.x, TL.y-BL.y) + Math.hypot(TR.x-MR.x, TR.y-MR.y)/Math.hypot(TR.x-BR.x, TR.y-BR.y)) / 2));
 
+            // Potongan Atas (Warp Top)
             let srcPtsTop = cv.matFromArray(4, 1, cv.CV_32FC2, [TL.x, TL.y, TR.x, TR.y, MR.x, MR.y, ML.x, ML.y]);
             let dstPtsTop = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, FIDUCIAL_WARP_W, 0, FIDUCIAL_WARP_W, targetMidY, 0, targetMidY]);
             let M_top = cv.getPerspectiveTransform(srcPtsTop, dstPtsTop), topWarped = new cv.Mat();
@@ -734,6 +734,7 @@
             let topRoi = strictWarpedMat.roi(new cv.Rect(0, 0, FIDUCIAL_WARP_W, targetMidY)); topWarped.copyTo(topRoi);
             topRoi.delete(); topWarped.delete(); M_top.delete(); srcPtsTop.delete(); dstPtsTop.delete();
 
+            // Potongan Bawah (Warp Bottom)
             let botH = FIDUCIAL_WARP_H - targetMidY;
             let srcPtsBot = cv.matFromArray(4, 1, cv.CV_32FC2, [ML.x, ML.y, MR.x, MR.y, BR.x, BR.y, BL.x, BL.y]);
             let dstPtsBot = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, FIDUCIAL_WARP_W, 0, FIDUCIAL_WARP_W, botH, 0, botH]);
@@ -741,6 +742,8 @@
             cv.warpPerspective(roughWarped, botWarped, M_bot, new cv.Size(FIDUCIAL_WARP_W, botH));
             let botRoi = strictWarpedMat.roi(new cv.Rect(0, targetMidY, FIDUCIAL_WARP_W, botH)); botWarped.copyTo(botRoi);
             botRoi.delete(); botWarped.delete(); M_bot.delete(); srcPtsBot.delete(); dstPtsBot.delete();
+            
+            logAI("Bagian Atas & Bawah Berhasil Disatukan!");
 
             document.getElementById('result-canvas').width = FIDUCIAL_WARP_W; document.getElementById('result-canvas').height = FIDUCIAL_WARP_H;
             
@@ -814,6 +817,9 @@
         }
     }
 
+    // =================================================================================
+    // 7. SISTEM PENILAIAN (GRADING SYSTEM)
+    // =================================================================================
     function evaluateCellGroup(opts, ctx, keyChar = null) {
         let sortedOpts = [...opts].sort((a,b) => b.d - a.d);
         let best = sortedOpts[0], second = sortedOpts[1], selected = keyChar === null ? ' ' : '-', isError = false;
@@ -876,6 +882,9 @@
         return { trueCount, falseCount, emptyCount, answers, correctNumbers, wrongNumbers };
     }
 
+    // =================================================================================
+    // 8. MANAJEMEN DATA & TABEL
+    // =================================================================================
     function updateTable() {
         let tbody = document.getElementById('result-table-body'); tbody.innerHTML = '';
         resultData.forEach(d => {
