@@ -26,7 +26,7 @@
     <header class="bg-slate-900 text-white rounded-xl p-6 shadow-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b-4 border-emerald-500">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-emerald-400">LJK Scanner Pro</h1>
-            <p class="text-sm text-slate-300 mt-1">v67.0 (Advanced Dynamic Tracking & Sharpness Lock)</p>
+            <p class="text-sm text-slate-300 mt-1">v67.0 (Dynamic Tracking & Sharpness Lock)</p>
         </div>
         <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700">
             <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV Memuat...
@@ -37,11 +37,11 @@
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
                 <span>Status Sistem</span>
-                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v67.0 AI-TRACK</span>
+                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v67.1 AI-TRACK</span>
             </h2>
             <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-56 overflow-y-auto shadow-inner leading-relaxed" id="ai-log">
-                > Sistem Dimulai. Menunggu Instruksi...<br>
-                > Kamera: UI ROI Guide & Dynamic Tracking Aktif.<br>
+                > Sistem Dimulai, Menunggu Instruksi...<br>
+                > Kamera: UI ROI Guide & Advanced Dynamic Tracking Aktif.<br>
                 > Kamera: Laplacian Sharpness & EMA Smoothing Aktif.<br>
             </div>
             <div>
@@ -540,12 +540,9 @@
 
     function cam_performDualWarp(src, fid) {
         let fullWarped = new cv.Mat(FIDUCIAL_WARP_H, FIDUCIAL_WARP_W, cv.CV_8UC4, new cv.Scalar(255,255,255,255));
-        let ratioL = (fid.ML.y - fid.TL.y) / (fid.BL.y - fid.TL.y);
-        let ratioR = (fid.MR.y - fid.TR.y) / (fid.BR.y - fid.TR.y);
-        let validRatioL = (ratioL > 0.45 && ratioL < 0.85) ? ratioL : 0.649;
-        let validRatioR = (ratioR > 0.45 && ratioR < 0.85) ? ratioR : 0.649;
-        let avgRatio = (validRatioL + validRatioR) / 2;
-        let splitY = Math.round(FIDUCIAL_WARP_H * avgRatio);
+        
+        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di 37/57)
+        let splitY = 37 * GRID_SIZE;
         let botHeight = FIDUCIAL_WARP_H - splitY;
 
         let srcTop = cv.matFromArray(4, 1, cv.CV_32FC2, [fid.TL.x, fid.TL.y, fid.TR.x, fid.TR.y, fid.MR.x, fid.MR.y, fid.ML.x, fid.ML.y]);
@@ -705,8 +702,8 @@
                         TR: { x: guideX + guideW, y: guideY },
                         BL: { x: guideX, y: guideY + guideH },
                         BR: { x: guideX + guideW, y: guideY + guideH },
-                        ML: { x: guideX, y: guideY + guideH * 0.649 },
-                        MR: { x: guideX + guideW, y: guideY + guideH * 0.649 }
+                        ML: { x: guideX, y: guideY + guideH * (37/57) },
+                        MR: { x: guideX + guideW, y: guideY + guideH * (37/57) }
                     };
 
                     let scale = TRACK_W / src.cols;
@@ -736,8 +733,8 @@
                         if (paperPts) {
                             let estFids = {
                                 TL: paperPts[0], TR: paperPts[1], BR: paperPts[2], BL: paperPts[3],
-                                ML: {x: paperPts[0].x + (paperPts[3].x - paperPts[0].x)*0.649, y: paperPts[0].y + (paperPts[3].y - paperPts[0].y)*0.649},
-                                MR: {x: paperPts[1].x + (paperPts[2].x - paperPts[1].x)*0.649, y: paperPts[1].y + (paperPts[2].y - paperPts[1].y)*0.649}
+                                ML: {x: paperPts[0].x + (paperPts[3].x - paperPts[0].x)*(37/57), y: paperPts[0].y + (paperPts[3].y - paperPts[0].y)*(37/57)},
+                                MR: {x: paperPts[1].x + (paperPts[2].x - paperPts[1].x)*(37/57), y: paperPts[1].y + (paperPts[2].y - paperPts[1].y)*(37/57)}
                             };
                             fids = cam_executeFastFiducialTracker(gray, estFids, 40);
                         }
@@ -966,12 +963,9 @@
 
     function up_performDualWarp(src, fid) {
         let fullWarped = new cv.Mat(FIDUCIAL_WARP_H, FIDUCIAL_WARP_W, cv.CV_8UC4, new cv.Scalar(255,255,255,255));
-        let ratioL = (fid.ML.y - fid.TL.y) / (fid.BL.y - fid.TL.y);
-        let ratioR = (fid.MR.y - fid.TR.y) / (fid.BR.y - fid.TR.y);
-        let validRatioL = (ratioL > 0.45 && ratioL < 0.85) ? ratioL : 0.649;
-        let validRatioR = (ratioR > 0.45 && ratioR < 0.85) ? ratioR : 0.649;
-        let avgRatio = (validRatioL + validRatioR) / 2;
-        let splitY = Math.round(FIDUCIAL_WARP_H * avgRatio);
+        
+        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di 37/57)
+        let splitY = 37 * GRID_SIZE;
         let botHeight = FIDUCIAL_WARP_H - splitY;
 
         let srcTop = cv.matFromArray(4, 1, cv.CV_32FC2, [fid.TL.x, fid.TL.y, fid.TR.x, fid.TR.y, fid.MR.x, fid.MR.y, fid.ML.x, fid.ML.y]);
@@ -1195,7 +1189,7 @@
         btnDownload.title = "Download Gambar LJK Hasil Scan";
         btnDownload.onclick = () => {
             const link = document.createElement('a');
-            link.download = `LJK_Scan_${data.peserta}_${data.name}.jpg`;
+            link.download = `LJK_Scan_${data.kelas}_${data.peserta}_${data.name}.jpg`;
             link.href = document.getElementById('result-canvas').toDataURL('image/jpeg', 0.9);
             link.click();
         };
@@ -1207,7 +1201,13 @@
             let btnCancel = document.createElement('button'); btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition"; btnCancel.innerText = "Batal"; btnCancel.onclick = () => closeModal('result-modal');
             let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition flex-1"; btnUpdate.innerText = "Update Data";
             btnUpdate.onclick = () => { 
-                if (pendingUpdateIndex !== -1 && pendingUpdateData) { resultData[pendingUpdateIndex] = pendingUpdateData; updateTable(); closeModal('result-modal'); } 
+                if (pendingUpdateIndex !== -1 && pendingUpdateData) { 
+                    let updated = getUpdatedData();
+                    updated.id = resultData[pendingUpdateIndex].id;
+                    resultData[pendingUpdateIndex] = updated; 
+                    updateTable(); 
+                    closeModal('result-modal'); 
+                } 
             };
             
             actionsDiv.appendChild(btnDownload);
