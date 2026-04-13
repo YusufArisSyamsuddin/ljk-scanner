@@ -22,45 +22,46 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
 
-<div class="max-w-7xl mx-auto p-4 md:p-6 flex-1 w-full">
-    <header class="bg-slate-900 text-white rounded-xl p-6 shadow-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b-4 border-emerald-500">
+<div class="max-w-7xl mx-auto p-3 md:p-6 flex-1 w-full">
+    <header class="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 text-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-xl mb-4 md:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4 border border-slate-800">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-emerald-400">LJK Scanner Pro</h1>
-            <p class="text-sm text-slate-300 mt-1">v67.0 (Dynamic Tracking & Sharpness Lock)</p>
+            <h1 class="text-xl md:text-2xl font-bold tracking-tight text-emerald-300">LJK Scanner AI-TRACK</h1>
+            <p class="text-xs md:text-sm text-slate-300 mt-1">Mesin pemindaian adaptif dengan pelacakan fiducial presisi</p>
         </div>
-        <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700">
-            <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV Memuat...
+        <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border border-slate-700">
+            <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV sedang dimuat...
         </div>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 h-fit flex flex-col">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 text-slate-800 flex justify-between items-center">
-                <span>Status Sistem</span>
-                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">v67.1 AI-TRACK</span>
+                <span>Status Pemindaian</span>
+                <span class="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">AI-TRACK v67.1</span>
             </h2>
             <div class="bg-black text-green-400 font-mono text-[10px] p-3 rounded-lg mb-4 h-56 overflow-y-auto shadow-inner leading-relaxed" id="ai-log">
-                > Sistem Dimulai, Menunggu Instruksi...<br>
-                > Kamera: UI ROI Guide & Advanced Dynamic Tracking Aktif.<br>
-                > Kamera: Laplacian Sharpness & EMA Smoothing Aktif.<br>
+                > Sistem siap. Menunggu sumber pemindaian...<br>
+                > Kamera: panduan ROI dan pelacakan dinamis aktif.<br>
+                > Kamera: pengunci ketajaman dan smoothing adaptif aktif.<br>
             </div>
             <p id="paper-config-badge" class="mt-3 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">Format aktif: F4 Portrait | Grid 38x61 | Fiducial 40</p>
             <div>
-                <label id="lbl-answer-key" class="block text-xs font-bold mb-2 text-slate-700 uppercase">Kunci Jawaban Aktif</label>
+                <label id="lbl-answer-key" class="block text-xs font-bold mb-1 text-slate-700 uppercase">Panel Kunci Jawaban</label>
+                <p id="answer-key-summary" class="mb-3 text-[11px] font-medium leading-relaxed text-slate-500">Belum ada blok soal aktif pada desain.</p>
                 <div id="answer-key-panels" class="space-y-3 mb-1"></div>
             </div>
         </div>
 
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 lg:col-span-2 flex flex-col relative">
             <h2 class="font-bold text-lg border-b border-slate-100 pb-3 mb-4 flex justify-between items-center text-slate-800 min-h-[3rem]">
-                <span class="whitespace-nowrap">Pratinjau</span>
-                <span id="scan-status" class="text-[10px] md:text-xs font-bold px-3 py-1 bg-slate-100 text-slate-500 rounded-full border border-slate-200 max-w-[180px] md:max-w-xs truncate text-center">Menunggu Aksi...</span>
+                <span class="whitespace-nowrap">Area Pemindaian</span>
+                <span id="scan-status" class="text-[10px] md:text-xs font-bold px-3 py-1 bg-slate-100 text-slate-500 rounded-full border border-slate-200 max-w-[180px] md:max-w-xs truncate text-center">Menunggu sumber scan...</span>
             </h2>
             <div id="video-container" class="relative w-full bg-[#0f172a] rounded-lg overflow-hidden flex-1 min-h-[500px] flex items-center justify-center checkerboard">
                 <div id="placeholder-text" class="text-slate-400 text-sm font-medium text-center px-4 leading-relaxed absolute z-0">
                     <svg class="w-16 h-16 mx-auto mb-3 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"></path></svg>
-                    Pilih mode Live Scanner atau Foto / Upload.<br>
-                    <span class="text-xs text-emerald-400">Paskan seluruh area kertas ke dalam layar.</span>
+                    Pilih mode kamera langsung atau unggah gambar LJK.<br>
+                    <span class="text-xs text-emerald-400">Pastikan seluruh bidang kertas terlihat utuh dan tegak.</span>
                 </div>
                 <video id="video" playsinline autoplay muted class="hidden"></video>
                 <canvas id="overlay-canvas" class="hidden pointer-events-none"></canvas>
@@ -69,7 +70,7 @@
                 <div id="loader-overlay" class="absolute inset-0 bg-slate-900/95 hidden flex-col justify-center items-center z-50 backdrop-blur-sm">
                     <div class="loader mb-4"></div>
                     <p id="loader-text" class="text-xs font-bold text-emerald-400 tracking-widest animate-pulse uppercase text-center leading-relaxed">
-                        Menganalisis LJK<br><span class="text-[9px] text-slate-400">Memproses Jalur Terisolasi...</span>
+                        Menganalisis lembar LJK<br><span class="text-[9px] text-slate-400">Menjalankan pipeline pemindaian presisi...</span>
                     </p>
                 </div>
             </div>
@@ -78,11 +79,11 @@
             <div class="flex flex-row gap-4 mt-5">
                 <button id="btn-camera" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-bold transition shadow-md flex justify-center items-center gap-2 text-sm sm:text-base">
                     <svg class="w-5 h-5 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    Live Scanner
+                    Live Scan Kamera
                 </button>
                 <button onclick="openModal('upload-choice-modal')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-lg font-bold transition shadow-md flex justify-center items-center gap-2 text-sm sm:text-base">
                     <svg class="w-5 h-5 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                    Upload Gambar
+                    Unggah Gambar
                 </button>
             </div>
         </div>
@@ -90,9 +91,9 @@
 
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-4 gap-4">
-            <h2 class="font-bold text-xl text-slate-800">Rekapitulasi Nilai</h2>
+            <h2 class="font-bold text-xl text-slate-800">Rekap Hasil Pemindaian</h2>
             <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
-                Download Excel
+                Unduh Excel
             </button>
         </div>
         <div class="overflow-x-auto rounded-lg border border-slate-200">
@@ -100,16 +101,16 @@
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-600">
                         <th class="p-4 font-bold text-center">Aksi</th>
-                        <th class="p-4 font-bold">No</th>
-                        <th class="p-4 font-bold text-slate-900">Nama Siswa</th>
-                        <th class="p-4 font-bold">Kls</th>
-                        <th class="p-4 font-bold">No. Peserta</th>
+                        <th class="p-4 font-bold">Nomor</th>
+                        <th class="p-4 font-bold text-slate-900">Nama Peserta</th>
+                        <th class="p-4 font-bold">Kelas</th>
+                        <th class="p-4 font-bold">Nomor Peserta</th>
                         <th class="p-4 font-bold text-emerald-500">Benar</th>
                         <th class="p-4 font-bold text-red-500">Salah</th>
                         <th class="p-4 font-bold text-slate-500">Kosong</th>
-                        <th class="p-4 font-bold text-emerald-600">No. Benar</th>
-                        <th class="p-4 font-bold text-red-600">No. Salah</th>
-                        <th class="p-4 font-bold text-slate-700">Detail Jawaban</th>
+                        <th class="p-4 font-bold text-emerald-600">Nomor Benar</th>
+                        <th class="p-4 font-bold text-red-600">Nomor Salah</th>
+                        <th class="p-4 font-bold text-slate-700">Jawaban Terdeteksi</th>
                     </tr>
                 </thead>
                 <tbody id="result-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
@@ -125,7 +126,7 @@
                 <svg class="w-6 h-6 text-emerald-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 LJK SCANNER PRO
             </h3>
-            <p class="text-sm font-medium mt-2 text-slate-300">Dirancang & Dikembangkan untuk Pendidikan Indonesia</p>
+            <p class="text-sm font-medium mt-2 text-slate-300">Dirancang untuk kebutuhan evaluasi berbasis LJK yang presisi dan praktis</p>
         </div>
         
         <div class="bg-slate-800/80 backdrop-blur-sm px-8 py-5 rounded-2xl border border-slate-700/50 shadow-xl transform hover:-translate-y-1 transition duration-300">
@@ -144,22 +145,22 @@
 <div id="upload-choice-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-[110]">
     <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal('upload-choice-modal')"></div>
     <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6 transform transition-all">
-        <h3 class="text-xl font-black text-slate-800 mb-2">Pilih Sumber Foto</h3>
-        <p class="text-sm text-slate-500 mb-6">Pilih metode untuk mengambil gambar LJK. Gambar akan diproses melalui Jalur Upload Mode yang sangat akurat.</p>
+        <h3 class="text-xl font-black text-slate-800 mb-2">Pilih Sumber Gambar LJK</h3>
+        <p class="text-sm text-slate-500 mb-6">Pilih metode pengambilan gambar. Setiap file akan diproses melalui jalur upload dengan kalibrasi fiducial presisi.</p>
         
         <div class="flex flex-col gap-3">
             <label class="w-full px-4 py-3.5 bg-emerald-600 text-white rounded-lg font-bold shadow-md hover:bg-emerald-700 hover:shadow-lg transition cursor-pointer flex items-center justify-center gap-3">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
-                Jepret Kamera HP
+                Ambil Foto dengan Kamera
                 <input type="file" id="upload-camera" accept="image/*" capture="environment" class="hidden">
             </label>
             <label class="w-full px-4 py-3.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold shadow-sm hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-3">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                Pilih dari Galeri
+                Pilih dari Perangkat
                 <input type="file" id="upload-gallery" accept="image/*" class="hidden">
             </label>
         </div>
-        <button onclick="closeModal('upload-choice-modal')" class="mt-6 text-sm text-slate-400 hover:text-slate-600 font-bold transition">Tutup Pilihan</button>
+        <button onclick="closeModal('upload-choice-modal')" class="mt-6 text-sm text-slate-400 hover:text-slate-600 font-bold transition">Tutup</button>
     </div>
 </div>
 
@@ -168,7 +169,7 @@
     <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded-xl shadow-2xl z-50 transform scale-95 transition-transform duration-300 overflow-hidden">
         <div class="modal-content py-6 text-left px-6">
             <div class="flex justify-between items-center pb-4 border-b border-slate-100">
-                <p id="modal-title" class="text-xl font-black text-emerald-600">Berhasil Dipindai!</p>
+                <p id="modal-title" class="text-xl font-black text-emerald-600">Hasil Pemindaian</p>
                 <div class="modal-close cursor-pointer z-50 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition" onclick="closeModal('result-modal')">
                     <svg class="fill-current text-slate-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
                 </div>
@@ -210,9 +211,9 @@
     <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
     <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6">
         <svg class="mx-auto mb-4 text-yellow-500 w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        <h3 class="text-lg font-black text-slate-800 mb-2">Pemberitahuan</h3>
+        <h3 class="text-lg font-black text-slate-800 mb-2">Informasi</h3>
         <p id="alert-message" class="text-sm text-slate-600 mb-5 leading-relaxed"></p>
-        <button onclick="closeModal('alert-modal')" class="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold shadow hover:bg-emerald-700 transition">Mengerti</button>
+        <button onclick="closeModal('alert-modal')" class="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold shadow hover:bg-emerald-700 transition">Tutup Pesan</button>
     </div>
 </div>
 
@@ -220,8 +221,8 @@
     <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
     <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6">
         <svg class="mx-auto mb-4 text-red-500 w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-        <h3 class="text-lg font-black text-slate-800 mb-2">Hapus Data</h3>
-        <p class="text-sm text-slate-600 mb-5">Apakah Anda yakin ingin menghapus data LJK ini dari tabel?</p>
+        <h3 class="text-lg font-black text-slate-800 mb-2">Hapus Hasil</h3>
+        <p class="text-sm text-slate-600 mb-5">Apakah Anda yakin ingin menghapus hasil pemindaian ini dari tabel rekap?</p>
         <div class="flex gap-3 justify-center">
             <button onclick="closeModal('confirm-modal')" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">Batal</button>
             <button id="btn-confirm-delete" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-bold shadow hover:bg-red-700 transition">Hapus</button>
@@ -236,47 +237,47 @@
     const START_X = 0, START_Y = 0;
     const DEFAULT_LAYOUT_CONFIG = {
   pengaturan_kertas: { grid_cols: 38, grid_rows: 61, fiducial_tengah_r: 40, preset_paper: 'F4', preset_orientation: 'P' },
-  kop_surat: { visible: false, src: '', c: 2, r: 0, w: 34 },
-  judul_utama: { visible: true, text: 'LEMBAR JAWABAN UJIAN\nNAMA INSTANSI', c: 2, r: 0, w: 34, h: 2 },
+  kop_surat: { visible: false, src: '', c: 2, r: 0, w: 18 },
+  judul_utama: { visible: true, text: 'LEMBAR JAWABAN UJIAN\nNAMA INSTANSI', c: 2, r: 0, w: 34, h: 3 },
   judul_secondary: { visible: true, blocks: [
-      { text: 'Mata Pelajaran :', c: 21, r: 2, w: 14, h: 1 },
-      { text: 'Hari / Tanggal :', c: 21, r: 3, w: 14, h: 1 }
+      { text: 'Mata Pelajaran :', c: 21, r: 4, w: 15, h: 1 },
+      { text: 'Hari / Tanggal :', c: 21, r: 5, w: 15, h: 1 }
   ]},
   identitas: {
     nama: { visible: true, title: 'NAMA PESERTA', layout: 'V', c: 2, r: 5, w: 18, h: 26 },
-    jenis_kelamin: { visible: true, title: 'JENIS KELAMIN', layout: 'V', c: 21, r: 5, w: 2, h: 1, labels: ['L', 'P'] },
-    no_peserta: { visible: true, title: 'NOMOR PESERTA', layout: 'V', c: 24, r: 7, w: 12, h: 10, labels: ['0','1','2','3','4','5','6','7','8','9','-'] },
-    kelas: { visible: true, title: 'KELAS', layout: 'V', c: 21, r: 7, w: 2, h: 12, labels: ['7','8','9','A','B','C','D','E','F','G','H','T'] }
+    jenis_kelamin: { visible: false, title: 'GENDER', layout: 'H', c: 21, r: 5, w: 2, h: 1, labels: ['L', 'P'] },
+    no_peserta: { visible: true, title: 'NOMOR PESERTA', layout: 'V', c: 21, r: 8, w: 12, h: 11, labels: ['0','1','2','3','4','5','6','7','8','9','-'] },
+    kelas: { visible: true, title: 'KELAS', layout: 'V', c: 34, r: 8, w: 2, h: 12, labels: ['7','8','9','A','B','C','D','E','F','G','H','T'] }
   },
   jawaban_pg: { visible: true, title: 'I. PILIHAN GANDA', startRow: 21, blocks: [
       { startSoal: 1, c: 22, rows: 10, options: 4, layout: 'H', labels: ['A','B','C','D'] },
-      { startSoal: 11, c: 27, rows: 10, options: 4, layout: 'H', labels: ['A','B','C','D'] },
-      { startSoal: 21, c: 32, rows: 5, options: 4, layout: 'H', labels: ['A','B','C','D'] }
+      { startSoal: 11, c: 27, rows: 10, options: 4, layout: 'H', labels: ['A','B','C','D'] }
   ]},
-  jawaban_pgk: { visible: true, title: 'II. PG KOMPLEKS', startRow: 33, blocks: [
-      { startSoal: 1, c: 3, rows: 5, options: 4, layout: 'H', labels: ['A','B','C','D'] }
+  jawaban_pgk: { visible: true, title: 'II. PG KOMPLEKS', startRow: 21, blocks: [
+      { startSoal: 21, c: 32, rows: 3, options: 4, layout: 'H', labels: ['A','B','C','D'] }
   ]},
-  jawaban_bs: { visible: true, title: 'III. PG Benar-Salah', startRow: 33, blocks: [
-      { startSoal: 1, c: 8, rows: 5, options: 2, layout: 'H', labels: ['B','S'] }
+  jawaban_bs: { visible: true, title: 'III. PG Benar-Salah', startRow: 26, blocks: [
+      { startSoal: 24, c: 32, rows: 2, options: 2, layout: 'H', labels: ['B','S'] }
   ]},
   jawaban_menjodohkan: { visible: true, title: 'IV. MENJODOHKAN', startRow: 33, blocks: [
-      { startSoal: 1, c: 15, rows: 5, options: 10, layout: 'H', labels: ['1','2','3','4','5','6','7','8','9','10'] },
-      { startSoal: 6, c: 26, rows: 5, options: 10, layout: 'H', labels: ['1','2','3','4','5','6','7','8','9','10'] }
+      { startSoal: 26, c: 3, rows: 5, options: 10, layout: 'H', labels: ['A','B','C','D','E','F','G','H','I','J'] },
+      { startSoal: 31, c: 14, rows: 5, options: 10, layout: 'H', labels: ['A','B','C','D','E','F','G','H','I','J'] }
   ]},
-  isian_singkat: { visible: true, title: 'V. ISIAN SINGKAT', startRow: 40, blocks: [
-      { startSoal: 1, c: 3, w: 6, rows: 10, h: 2 }
+  isian_singkat: { visible: true, title: 'V. ISIAN SINGKAT', startRow: 33, blocks: [
+      { startSoal: 36, c: 25, w: 5, rows: 5, h: 1 },
+      { startSoal: 41, c: 31, w: 5, rows: 5, h: 1 }
   ]},
   uraian: { visible: true, title: 'VI. URAIAN', startRow: 40, showDots: true, blocks: [
-      { startSoal: 1, c: 11, w: 25, rows: 5, h: 4 }
+      { startSoal: 46, c: 3, w: 33, rows: 5, h: 4 }
   ]}
 };
     const DEFAULT_PAPER_CONFIG = { gridCols: 38, gridRows: 61, fiducialMiddleRow: 40, presetPaper: 'F4', orientation: 'P' };
     const KEY_STORAGE_KEY = 'ljk-suite-answer-keys-v2';
     const SECTION_META = {
         jawaban_pg: { id: 'jawaban_pg', label: 'Pilihan Ganda', short: 'PG', mode: 'single', placeholder: 'Contoh: ABCDABCD atau A,B,C,D', help: 'Isi 1 huruf per nomor. Huruf yang diterima: A-D.' },
-        jawaban_pgk: { id: 'jawaban_pgk', label: 'Pilihan Ganda Kompleks', short: 'PGK', mode: 'multi', placeholder: 'Contoh: AB, AC, BD, CD', help: 'Pisahkan tiap nomor dengan koma. Tiap nomor dapat berisi 2 huruf benar, misalnya AB.' },
+        jawaban_pgk: { id: 'jawaban_pgk', label: 'Pilihan Ganda Kompleks', short: 'PGK', mode: 'multi', placeholder: 'Contoh: AB, AC, BD, CD', help: 'Pisahkan tiap nomor dengan koma. Tiap nomor dapat berisi lebih dari satu jawaban benar, misalnya AB.' },
         jawaban_bs: { id: 'jawaban_bs', label: 'Benar / Salah', short: 'BS', mode: 'single', placeholder: 'Contoh: BSBSB atau B,S,B,S,B', help: 'Isi 1 huruf per nomor. Huruf yang diterima: B atau S.' },
-        jawaban_menjodohkan: { id: 'jawaban_menjodohkan', label: 'Menjodohkan', short: 'MJ', mode: 'single_token', placeholder: 'Contoh: 1,3,5,2,10', help: 'Pisahkan tiap nomor dengan koma. Nilai mengikuti label opsi pada desain.' }
+        jawaban_menjodohkan: { id: 'jawaban_menjodohkan', label: 'Menjodohkan', short: 'MJ', mode: 'single_token', placeholder: 'Contoh: A,C,E,B,J', help: 'Pisahkan tiap nomor dengan koma. Nilai mengikuti label opsi yang tampil pada desain.' }
     };
     let paperConfig = { ...DEFAULT_PAPER_CONFIG };
     let activeLayoutConfig = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
@@ -377,13 +378,7 @@
         return deepCopy(activeLayoutConfig);
     }
 
-    const MATRIX_MAP = {
-        name: { c: 0, r: 0, w: 20, h: 26, skipRow: 2 }, 
-        kelas: { c: 21, r: 14, w: 2, h: 12, skipRow: 2 }, 
-        peserta: { c: 24, r: 14, w: 7, h: 12, skipRow: 2 }, 
-        answers: { startRow: 29, skipRow: 1, qPerCol: 10, options: 4, blocks: [{startCol:0}, {startCol:5}, {startCol:10}, {startCol:15}, {startCol:20}], optionOffset: 1 }
-    };
-    
+    // Legacy MATRIX_MAP dihapus; ekstraksi kini mengikuti layout dinamis dari desainer.
     const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
     const NUMBERS = "0123456789-".split('');
     const KELAS_VALS = ['7','8','9','A','B','C','D','E','F','G','H','T'];
@@ -415,7 +410,7 @@
 
     function defaultSectionLabels(sectionId, optionCount) {
         if (sectionId === 'jawaban_bs') return ['B', 'S'];
-        if (sectionId === 'jawaban_menjodohkan') return Array.from({ length: optionCount }, (_, i) => String(i + 1));
+        if (sectionId === 'jawaban_menjodohkan') return Array.from({ length: optionCount }, (_, i) => String.fromCharCode(65 + i));
         return Array.from({ length: optionCount }, (_, i) => String.fromCharCode(65 + i));
     }
 
@@ -455,7 +450,10 @@
     function updateAnswerKeyHeader() {
         const sections = getVisibleAnswerSections();
         const total = sections.reduce((sum, section) => sum + section.questions.length, 0);
-        document.getElementById('lbl-answer-key').innerText = total > 0 ? `Kunci Jawaban Aktif (${total})` : 'Kunci Jawaban Aktif';
+        const label = document.getElementById('lbl-answer-key');
+        const summary = document.getElementById('answer-key-summary');
+        if (label) label.textContent = 'Panel Kunci Jawaban';
+        if (summary) summary.textContent = total > 0 ? `Total soal aktif: ${total} nomor.` : 'Belum ada blok soal aktif pada desain.';
     }
 
     function renderAnswerKeyInputs() {
@@ -570,10 +568,10 @@
         document.getElementById('placeholder-text').classList.add('hidden');
         camStableFrames = 0; camLostFrames = 0; camLastFids = null; camLastProcessTime = 0;
         isProcessing = false; 
-        scanStatus.innerText = "Kamera Nonaktif";
+        scanStatus.innerText = "Pemindai kamera tidak aktif";
     }
 
-    const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> OpenCV Siap'; } }, 500);
+    const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> Engine OpenCV Siap'; } }, 500);
 
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
     
@@ -701,6 +699,7 @@
 
         getVisibleAnswerSections().forEach(section => {
             const sectionKeys = keyMap[section.id] || [];
+            const sectionAnswers = [];
             section.questions.forEach((question, index) => {
                 const opts = question.options.map(option => {
                     const cell = shared_getGridCell(grid, designerToGridRow(option.r), designerToGridCol(option.c));
@@ -712,7 +711,7 @@
                 const detected = section.mode === 'multi'
                     ? shared_evaluateMultiChoice(opts, ctx, keyToken)
                     : shared_evaluateSingleChoice(opts, ctx, keyToken);
-                answers.push(`${question.shortLabel}${question.number}:${detected}`);
+                sectionAnswers.push(`${question.number}-${detected}`);
                 const numberLabel = `${question.shortLabel} ${question.number}`;
                 if (detected === '-' || detected === '*') {
                     emptyCount++;
@@ -724,6 +723,7 @@
                     wrongNumbers.push(numberLabel);
                 }
             });
+            if (sectionAnswers.length) answers.push(`${section.short}: ${sectionAnswers.join(', ')}`);
         });
 
         return { trueCount, falseCount, emptyCount, answers, correctNumbers, wrongNumbers };
@@ -996,7 +996,7 @@
 
     document.getElementById('btn-camera').addEventListener('click', async () => {
         if (!validateKey() || isProcessing) return; 
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showCustomAlert("Akses kamera tidak diizinkan."); return; }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showCustomAlert("Browser belum memberikan izin akses kamera."); return; }
         
         resetUI(); 
         video.classList.remove('hidden'); overlayCanvas.classList.remove('hidden');
@@ -1014,7 +1014,7 @@
                     startStreamLoop();
                 });
             };
-        } catch (e) { logAI("Kamera Error: " + e.message, true); showCustomAlert("Akses kamera ditolak."); resetUI(); }
+        } catch (e) { logAI("Kamera Error: " + e.message, true); showCustomAlert("Akses kamera ditolak oleh browser atau perangkat."); resetUI(); }
     });
 
     function startStreamLoop() {
@@ -1434,7 +1434,7 @@
             document.getElementById('result-canvas').classList.remove('hidden');
 
             if(isFailedWarp) {
-                showCustomAlert("PENGAMATAN DEBUG:\nSistem gagal menemukan 6 titik kotak LJK secara selaras.\n\nGambar yang diluruskan secara kasar tetap ditampilkan pada layar agar Bapak dapat menganalisis letak distorsi atau bayangannya.");
+                showCustomAlert("Diagnostik Pemindaian:\nSistem gagal menemukan 6 titik kotak LJK secara selaras.\n\nGambar yang diluruskan secara kasar tetap ditampilkan pada layar agar Bapak dapat menganalisis letak distorsi atau bayangannya.");
                 return;
             }
 
@@ -1445,7 +1445,7 @@
                 cv.imshow('result-canvas', finalWarpedMat);
                 isSuccess = up_performExtraction(finalWarpedMat); 
                 if (!isSuccess) {
-                    showCustomAlert("PENGAMATAN DEBUG:\nIsian LJK tidak dapat diekstrak atau grid tidak selaras. Gambar telah dipertahankan di layar untuk analisis Bapak.");
+                    showCustomAlert("Diagnostik Pemindaian:\nIsian LJK tidak dapat diekstrak atau grid tidak selaras. Gambar telah dipertahankan di layar untuk analisis Bapak.");
                 }
             }
         } catch (err) {
@@ -1544,10 +1544,10 @@
 
         if (isDuplicate) {
             pendingUpdateData = data; pendingUpdateIndex = index;
-            modalTitle.innerText = "Peringatan: Data Sudah Ada!"; modalTitle.classList.replace('text-emerald-600', 'text-yellow-600');
+            modalTitle.innerText = "Data Peserta Sudah Tersedia"; modalTitle.classList.replace('text-emerald-600', 'text-yellow-600');
             
             let btnCancel = document.createElement('button'); btnCancel.className = "px-5 py-2.5 bg-slate-100 font-bold text-slate-600 rounded-lg hover:bg-slate-200 transition"; btnCancel.innerText = "Batal"; btnCancel.onclick = () => closeModal('result-modal');
-            let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition flex-1"; btnUpdate.innerText = "Update Data";
+            let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition flex-1"; btnUpdate.innerText = "Perbarui Data";
             btnUpdate.onclick = () => { 
                 if (pendingUpdateIndex !== -1 && pendingUpdateData) { 
                     let updated = getUpdatedData();
@@ -1562,9 +1562,9 @@
             actionsDiv.appendChild(btnCancel); 
             actionsDiv.appendChild(btnUpdate);
         } else {
-            modalTitle.innerText = "Berhasil Dipindai!"; modalTitle.classList.replace('text-yellow-600', 'text-emerald-600');
+            modalTitle.innerText = "Hasil Pemindaian Tersimpan"; modalTitle.classList.replace('text-yellow-600', 'text-emerald-600');
             
-            let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 flex-1 text-center transition shadow-md"; btnClose.innerText = "Simpan & Lanjut"; 
+            let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 flex-1 text-center transition shadow-md"; btnClose.innerText = "Simpan dan Lanjutkan"; 
             btnClose.onclick = () => { 
                 let updated = getUpdatedData();
                 let idx = resultData.findIndex(d => d.id === updated.id);
@@ -1580,7 +1580,7 @@
     }
 
     document.getElementById('btn-export').addEventListener('click', () => {
-        if (!resultData.length) return showCustomAlert("Belum ada data nilai.");
+        if (!resultData.length) return showCustomAlert("Belum ada hasil pemindaian untuk diekspor.");
         const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama": d.name, "Kelas": d.kelas, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Benar": d.correctNumbers.join(', '), "Detail Salah": d.wrongNumbers.join(', '), "Jawaban": d.answers.join(' | ') })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap LJK");
         XLSX.writeFile(wb, `Rekap_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -1608,7 +1608,7 @@
 </script>
 
 <script>
-window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":54,"fiducial_tengah_r":26,"preset_paper":"A4","preset_orientation":"P"},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":34},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN UJIAN\nNAMA INSTANSI","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Mata Pelajaran :","c":21,"r":4,"w":15,"h":1},{"text":"Hari / Tanggal :","c":21,"r":5,"w":15,"h":1}]},"identitas":{"nama":{"visible":true,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":21,"r":8,"w":12,"h":11,"labels":["0","1","2","3","4","5","6","7","8","9","-"]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":34,"r":8,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":21,"blocks":[{"startSoal":1,"c":22,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":27,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":21,"blocks":[{"startSoal":21,"c":32,"rows":3,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":true,"title":"III. PG Benar-Salah","startRow":25,"blocks":[{"startSoal":24,"c":32,"rows":2,"options":2,"layout":"H","labels":["B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":32,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":32,"blocks":[{"startSoal":36,"c":25,"w":5,"rows":5,"h":1},{"startSoal":41,"c":31,"w":5,"rows":5,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":38,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":3}]}};
+window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":61,"fiducial_tengah_r":40,"preset_paper":"F4","preset_orientation":"P"},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":18},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN UJIAN ASTS GENAP\nSMP NEGERI 2 SECANG\nTAHUN PELAJARAN 2025/2026","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Mata Pelajaran :","c":21,"r":4,"w":15,"h":1},{"text":"Hari / Tanggal :","c":21,"r":5,"w":15,"h":1}]},"identitas":{"nama":{"visible":true,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":21,"r":8,"w":12,"h":11,"labels":["0","1","2","3","4","5","6","7","8","9","-"]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":34,"r":8,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":21,"blocks":[{"startSoal":1,"c":22,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":27,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":21,"blocks":[{"startSoal":21,"c":32,"rows":3,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":true,"title":"III. PG Benar-Salah","startRow":26,"blocks":[{"startSoal":24,"c":32,"rows":2,"options":2,"layout":"H","labels":["B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":33,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":33,"blocks":[{"startSoal":36,"c":25,"w":5,"rows":5,"h":1},{"startSoal":41,"c":31,"w":5,"rows":5,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":40,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":4}]}};
 window.addEventListener('load', () => {
   try {
     if (window.ScannerApp?.applyLayoutConfig) {
