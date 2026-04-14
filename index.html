@@ -44,7 +44,7 @@
                 > Kamera: panduan ROI dan pelacakan dinamis aktif.<br>
                 > Kamera: pengunci ketajaman dan smoothing adaptif aktif.<br>
             </div>
-            <p id="paper-config-badge" class="mt-3 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">Format aktif: F4 Portrait | Grid 38x61 | Fiducial 40</p>
+            <p id="paper-config-badge" class="mt-3 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">Format aktif: F4 Portrait | Grid 38x61 | Fiducial 30</p>
             <div>
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-1 text-slate-700 uppercase">Panel Kunci Jawaban</label>
                 <p id="answer-key-summary" class="mb-3 text-[11px] font-medium leading-relaxed text-slate-500">Belum ada blok soal aktif pada desain.</p>
@@ -271,7 +271,7 @@
       { startSoal: 46, c: 3, w: 33, rows: 5, h: 4 }
   ]}
 };
-    const DEFAULT_PAPER_CONFIG = { gridCols: 38, gridRows: 61, fiducialMiddleRow: 40, presetPaper: 'F4', orientation: 'P' };
+    const DEFAULT_PAPER_CONFIG = { gridCols: 38, gridRows: 61, fiducialMiddleRow: 30, presetPaper: 'F4', orientation: 'P' };
     const KEY_STORAGE_KEY = 'ljk-suite-answer-keys-v2';
     const SECTION_META = {
         jawaban_pg: { id: 'jawaban_pg', label: 'Pilihan Ganda', short: 'PG', mode: 'single', placeholder: 'Contoh: ABCDABCD atau A,B,C,D', help: 'Isi 1 huruf per nomor. Huruf yang diterima: A-D.' },
