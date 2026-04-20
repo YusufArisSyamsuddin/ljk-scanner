@@ -236,7 +236,22 @@
     const GRID_SIZE = 30;
     const START_X = 0, START_Y = 0;
     const DEFAULT_LAYOUT_CONFIG = {
-  pengaturan_kertas: { grid_cols: 38, grid_rows: 61, fiducial_tengah_r: 40, preset_paper: 'F4', preset_orientation: 'P' },
+  pengaturan_kertas: {
+    grid_cols: 38,
+    grid_rows: 61,
+    fiducial_tengah_r: 40,
+    fiducial_tengah_kiri_c: 1,
+    fiducial_tengah_kanan_c: 37,
+    preset_paper: 'F4',
+    preset_orientation: 'P',
+    paper_width_mm: 210,
+    paper_height_mm: 330,
+    margin_left_mm: 5,
+    margin_top_mm: 5,
+    margin_right_mm: 5,
+    margin_bottom_mm: 5
+  },
+  pengaturan_arsiran: { diameter_ratio: 0.72, stroke_width: 1.1, font_size: 9.5, font_weight: 500 },
   kop_surat: { visible: false, src: '', c: 2, r: 0, w: 18 },
   judul_utama: { visible: true, text: 'LEMBAR JAWABAN UJIAN\nNAMA INSTANSI', c: 2, r: 0, w: 34, h: 3 },
   judul_secondary: { visible: true, blocks: [
@@ -271,7 +286,16 @@
       { startSoal: 46, c: 3, w: 33, rows: 5, h: 4 }
   ]}
 };
-    const DEFAULT_PAPER_CONFIG = { gridCols: 38, gridRows: 61, fiducialMiddleRow: 40, presetPaper: 'F4', orientation: 'P' };
+    const DEFAULT_PAPER_CONFIG = {
+        gridCols: 38,
+        gridRows: 61,
+        fiducialMiddleRow: 40,
+        fiducialMiddleLeftCol: 1,
+        fiducialMiddleRightCol: 37,
+        presetPaper: 'F4',
+        orientation: 'P'
+    };
+    const DEFAULT_BUBBLE_CONFIG = { diameterRatio: 0.72, strokeWidth: 1.1, fontSize: 9.5, fontWeight: 500 };
     const KEY_STORAGE_KEY = 'ljk-suite-answer-keys-v2';
     const SECTION_META = {
         jawaban_pg: { id: 'jawaban_pg', label: 'Pilihan Ganda', short: 'PG', mode: 'single', placeholder: 'Contoh: ABCDABCD atau A,B,C,D', help: 'Isi 1 huruf per nomor. Huruf yang diterima: A-D.' },
@@ -280,6 +304,7 @@
         jawaban_menjodohkan: { id: 'jawaban_menjodohkan', label: 'Menjodohkan', short: 'MJ', mode: 'single_token', placeholder: 'Contoh: A,C,E,B,J', help: 'Pisahkan tiap nomor dengan koma. Nilai mengikuti label opsi yang tampil pada desain.' }
     };
     let paperConfig = { ...DEFAULT_PAPER_CONFIG };
+    let bubbleConfig = { ...DEFAULT_BUBBLE_CONFIG };
     let activeLayoutConfig = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
     let answerKeyState = {};
 
@@ -307,18 +332,38 @@
         return Math.max(min, Math.min(max, Math.round(num)));
     }
 
+    function clampFloatValue(value, fallback, min, max) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return fallback;
+        return Math.max(min, Math.min(max, num));
+    }
+
     function normalizePaperConfig(cfg = {}) {
         const merged = { ...DEFAULT_PAPER_CONFIG, ...(cfg || {}) };
         const gridCols = clampPaperValue(merged.gridCols, DEFAULT_PAPER_CONFIG.gridCols, 20, 120);
         const gridRows = clampPaperValue(merged.gridRows, DEFAULT_PAPER_CONFIG.gridRows, 20, 180);
         const fidMax = Math.max(7, gridRows - 5);
         const fiducialMiddleRow = clampPaperValue(merged.fiducialMiddleRow, DEFAULT_PAPER_CONFIG.fiducialMiddleRow, 7, fidMax);
+        const fiducialMiddleLeftCol = clampPaperValue(merged.fiducialMiddleLeftCol, DEFAULT_PAPER_CONFIG.fiducialMiddleLeftCol, 1, Math.max(1, Math.floor(gridCols / 3)));
+        const fiducialMiddleRightCol = clampPaperValue(merged.fiducialMiddleRightCol, DEFAULT_PAPER_CONFIG.fiducialMiddleRightCol, Math.max(fiducialMiddleLeftCol + 4, Math.floor((gridCols * 2) / 3)), gridCols - 1);
         return {
             gridCols,
             gridRows,
             fiducialMiddleRow,
+            fiducialMiddleLeftCol,
+            fiducialMiddleRightCol,
             presetPaper: merged.presetPaper || 'CUSTOM',
             orientation: merged.orientation || 'P'
+        };
+    }
+
+    function normalizeBubbleConfig(cfg = {}) {
+        const merged = { ...DEFAULT_BUBBLE_CONFIG, ...(cfg || {}) };
+        return {
+            diameterRatio: clampFloatValue(merged.diameterRatio, DEFAULT_BUBBLE_CONFIG.diameterRatio, 0.55, 0.9),
+            strokeWidth: clampFloatValue(merged.strokeWidth, DEFAULT_BUBBLE_CONFIG.strokeWidth, 0.5, 3),
+            fontSize: clampFloatValue(merged.fontSize, DEFAULT_BUBBLE_CONFIG.fontSize, 6, 16),
+            fontWeight: clampPaperValue(merged.fontWeight, DEFAULT_BUBBLE_CONFIG.fontWeight, 300, 700)
         };
     }
 
@@ -335,7 +380,33 @@
         const warpRows = getWarpRows();
         return clampPaperValue(paperConfig.fiducialMiddleRow, DEFAULT_PAPER_CONFIG.fiducialMiddleRow, 1, warpRows - 1);
     }
-    function getMiddleRatio() { return getSplitRows() / getWarpRows(); }
+    function getMiddleGuideRatio() { return clampFloatValue((paperConfig.fiducialMiddleRow + 1) / Math.max(1, paperConfig.gridRows), 0.67, 0.1, 0.95); }
+    function getLeftMiddleGuideRatio() { return clampFloatValue(paperConfig.fiducialMiddleLeftCol / Math.max(1, paperConfig.gridCols), 0.03, 0.01, 0.4); }
+    function getRightMiddleGuideRatio() { return clampFloatValue(paperConfig.fiducialMiddleRightCol / Math.max(1, paperConfig.gridCols), 0.97, 0.6, 0.99); }
+    function getBubbleSamplingScale() {
+        return clampFloatValue(
+            0.40 + ((bubbleConfig.diameterRatio - 0.72) * 0.22) - (Math.max(0, bubbleConfig.fontSize - 10) * 0.008) - (bubbleConfig.fontWeight >= 600 ? 0.01 : 0),
+            0.42,
+            0.34,
+            0.48
+        );
+    }
+    function getBubbleMarkedFillRatio() {
+        return clampFloatValue(
+            0.18 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.10 + Math.max(0, bubbleConfig.fontSize - 10) * 0.004 + (bubbleConfig.fontWeight >= 600 ? 0.01 : 0),
+            0.18,
+            0.17,
+            0.24
+        );
+    }
+    function getBubbleSignalRatio() {
+        return clampFloatValue(3.0 + (bubbleConfig.fontWeight >= 600 ? 0.08 : 0), 3.0, 2.8, 3.4);
+    }
+    function interpolateQuadPoint(quad, u, v) {
+        const top = { x: quad.TL.x + ((quad.TR.x - quad.TL.x) * u), y: quad.TL.y + ((quad.TR.y - quad.TL.y) * u) };
+        const bottom = { x: quad.BL.x + ((quad.BR.x - quad.BL.x) * u), y: quad.BL.y + ((quad.BR.y - quad.BL.y) * u) };
+        return { x: top.x + ((bottom.x - top.x) * v), y: top.y + ((bottom.y - top.y) * v) };
+    }
     // Desainer memakai acuan 0,0 di garis batas kertas, sedangkan crop scanner mulai di pusat fiducial (garis 1,1 menurut desain).
     // Karena bubble pada kolom/baris desain c,r berada di tengah sel setelah garis c dan r, maka indeks grid scanner = desain - 1.
     function designerToGridCol(col) { return clampPaperValue(Number(col) - 1, 0, 0, Math.max(0, getGridColsCount() - 1)); }
@@ -360,7 +431,7 @@
         const badge = document.getElementById('paper-config-badge');
         if (badge) {
             const orientationLabel = paperConfig.orientation === 'L' ? 'Landscape' : 'Portrait';
-            badge.textContent = `Format aktif: ${paperConfig.presetPaper} ${orientationLabel} | Grid ${paperConfig.gridCols}x${paperConfig.gridRows} | Fiducial ${paperConfig.fiducialMiddleRow}`;
+            badge.textContent = `Format aktif: ${paperConfig.presetPaper} ${orientationLabel} | Grid ${paperConfig.gridCols}x${paperConfig.gridRows} | Fiducial ${paperConfig.fiducialMiddleRow} | Bubble ${Math.round(bubbleConfig.diameterRatio * 100)}%`;
         }
         return { ...paperConfig };
     }
@@ -371,9 +442,18 @@
             gridCols: activeLayoutConfig.pengaturan_kertas?.grid_cols,
             gridRows: activeLayoutConfig.pengaturan_kertas?.grid_rows,
             fiducialMiddleRow: activeLayoutConfig.pengaturan_kertas?.fiducial_tengah_r,
+            fiducialMiddleLeftCol: activeLayoutConfig.pengaturan_kertas?.fiducial_tengah_kiri_c,
+            fiducialMiddleRightCol: activeLayoutConfig.pengaturan_kertas?.fiducial_tengah_kanan_c,
             presetPaper: activeLayoutConfig.pengaturan_kertas?.preset_paper,
             orientation: activeLayoutConfig.pengaturan_kertas?.preset_orientation
         });
+        bubbleConfig = normalizeBubbleConfig({
+            diameterRatio: activeLayoutConfig.pengaturan_arsiran?.diameter_ratio,
+            strokeWidth: activeLayoutConfig.pengaturan_arsiran?.stroke_width,
+            fontSize: activeLayoutConfig.pengaturan_arsiran?.font_size,
+            fontWeight: activeLayoutConfig.pengaturan_arsiran?.font_weight
+        });
+        applyPaperConfig(paperConfig);
         renderAnswerKeyInputs();
         return deepCopy(activeLayoutConfig);
     }
@@ -450,10 +530,11 @@
     function updateAnswerKeyHeader() {
         const sections = getVisibleAnswerSections();
         const total = sections.reduce((sum, section) => sum + section.questions.length, 0);
+        const active = sections.reduce((sum, section) => sum + parseAnswerKeyValue(section.id, answerKeyState[section.id] || '', section.questions).length, 0);
         const label = document.getElementById('lbl-answer-key');
         const summary = document.getElementById('answer-key-summary');
         if (label) label.textContent = 'Panel Kunci Jawaban';
-        if (summary) summary.textContent = total > 0 ? `Total soal aktif: ${total} nomor.` : 'Belum ada blok soal aktif pada desain.';
+        if (summary) summary.textContent = total > 0 ? `Slot desain aktif: ${total} nomor. Kunci yang akan dinilai: ${active} nomor.` : 'Belum ada blok soal aktif pada desain.';
     }
 
     function renderAnswerKeyInputs() {
@@ -475,7 +556,7 @@
                         <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-1">${section.questions.length} soal</span>
                     </div>
                     <textarea id="answer-key-${section.id}" data-section-id="${section.id}" rows="${section.id === 'jawaban_menjodohkan' ? 4 : 3}" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 uppercase tracking-widest font-mono font-bold text-emerald-700 resize-y leading-relaxed" placeholder="${section.placeholder}">${value}</textarea>
-                    <p class="mt-2 text-[10px] leading-relaxed text-slate-500">${section.help}</p>
+                    <p class="mt-2 text-[10px] leading-relaxed text-slate-500">${section.help} Anda boleh mengisi lebih sedikit dari jumlah slot desain; scanner hanya menilai nomor yang memiliki kunci.</p>
                 </div>
             `;
         }).join('');
@@ -518,19 +599,21 @@
         const issues = [];
         const keys = {};
         let focusId = '';
+        let totalKeys = 0;
         sections.forEach(section => {
             const field = document.getElementById(`answer-key-${section.id}`);
             const rawValue = field ? field.value : (answerKeyState[section.id] || '');
             if (field) answerKeyState[section.id] = rawValue.toUpperCase();
-            const parsed = parseAnswerKeyValue(section.id, rawValue, section.questions);
+            const parsed = parseAnswerKeyValue(section.id, rawValue, section.questions).slice(0, section.questions.length);
             keys[section.id] = parsed;
-            if (parsed.length !== section.questions.length) {
-                if (!focusId) focusId = `answer-key-${section.id}`;
-                issues.push(`${section.label}: butuh ${section.questions.length} kunci, terbaca ${parsed.length}.`);
+            totalKeys += parsed.length;
+            if (!focusId && !parsed.length) {
+                focusId = `answer-key-${section.id}`;
             }
         });
         persistAnswerKeys();
-        return { keys, issues, focusId };
+        if (!totalKeys) issues.push('Isi minimal satu kunci jawaban agar proses penilaian dapat berjalan.');
+        return { keys, issues, focusId, totalKeys };
     }
 
     function validateKey() {
@@ -602,7 +685,7 @@
         return opts.map(opt => ({
             ...opt,
             fillRatio: opt.area ? (opt.d / opt.area) : 0,
-            marked: opt.area > 0 && (opt.d / Math.max(effectiveNoise, 1)) >= 3.0 && (opt.d / opt.area) >= 0.15
+            marked: opt.area > 0 && (opt.d / Math.max(effectiveNoise, 1)) >= getBubbleSignalRatio() && (opt.d / opt.area) >= getBubbleMarkedFillRatio()
         }));
     }
 
@@ -701,6 +784,7 @@
             const sectionKeys = keyMap[section.id] || [];
             const sectionAnswers = [];
             section.questions.forEach((question, index) => {
+                if (index >= sectionKeys.length) return;
                 const opts = question.options.map(option => {
                     const cell = shared_getGridCell(grid, designerToGridRow(option.r), designerToGridCol(option.c));
                     return { v: String(option.v).toUpperCase(), d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy };
@@ -708,6 +792,7 @@
                 const keyToken = section.mode === 'multi'
                     ? normalizeTokenForOrder(sectionKeys[index] || '', opts.map(opt => opt.v))
                     : String(sectionKeys[index] || '').toUpperCase().trim();
+                if (!keyToken) return;
                 const detected = section.mode === 'multi'
                     ? shared_evaluateMultiChoice(opts, ctx, keyToken)
                     : shared_evaluateSingleChoice(opts, ctx, keyToken);
@@ -887,7 +972,7 @@
     function cam_performDualWarp(src, fid) {
         let fullWarped = new cv.Mat(getWarpHeight(), getWarpWidth(), cv.CV_8UC4, new cv.Scalar(255,255,255,255));
         
-        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di getMiddleRatio())
+        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di getMiddleGuideRatio())
         let splitY = getSplitRows() * GRID_SIZE;
         let botHeight = getWarpHeight() - splitY;
 
@@ -932,7 +1017,7 @@
                 for(let c = 0; c < gridCols; c++) {
                     let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
                     let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.floor(GRID_SIZE * 0.55); 
+                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale())); 
                     let roi = thresh.roi(new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize));
                     gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy }; roi.delete();
                 }
@@ -1044,13 +1129,19 @@
                     let guideX = (cw - guideW) / 2;
                     let guideY = (ch - guideH) / 2;
 
-                    let uiGuidePts = {
+                    let guideQuad = {
                         TL: { x: guideX, y: guideY },
                         TR: { x: guideX + guideW, y: guideY },
                         BL: { x: guideX, y: guideY + guideH },
-                        BR: { x: guideX + guideW, y: guideY + guideH },
-                        ML: { x: guideX, y: guideY + guideH * (getMiddleRatio()) },
-                        MR: { x: guideX + guideW, y: guideY + guideH * (getMiddleRatio()) }
+                        BR: { x: guideX + guideW, y: guideY + guideH }
+                    };
+                    let uiGuidePts = {
+                        TL: guideQuad.TL,
+                        TR: guideQuad.TR,
+                        BL: guideQuad.BL,
+                        BR: guideQuad.BR,
+                        ML: interpolateQuadPoint(guideQuad, getLeftMiddleGuideRatio(), getMiddleGuideRatio()),
+                        MR: interpolateQuadPoint(guideQuad, getRightMiddleGuideRatio(), getMiddleGuideRatio())
                     };
 
                     let scale = TRACK_W / src.cols;
@@ -1078,10 +1169,14 @@
                     if (!fids && camLostFrames > 5) {
                         let paperPts = cam_detectPaperRegionFallback(gray);
                         if (paperPts) {
+                            let paperQuad = { TL: paperPts[0], TR: paperPts[1], BR: paperPts[2], BL: paperPts[3] };
                             let estFids = {
-                                TL: paperPts[0], TR: paperPts[1], BR: paperPts[2], BL: paperPts[3],
-                                ML: {x: paperPts[0].x + (paperPts[3].x - paperPts[0].x)*(getMiddleRatio()), y: paperPts[0].y + (paperPts[3].y - paperPts[0].y)*(getMiddleRatio())},
-                                MR: {x: paperPts[1].x + (paperPts[2].x - paperPts[1].x)*(getMiddleRatio()), y: paperPts[1].y + (paperPts[2].y - paperPts[1].y)*(getMiddleRatio())}
+                                TL: paperQuad.TL,
+                                TR: paperQuad.TR,
+                                BR: paperQuad.BR,
+                                BL: paperQuad.BL,
+                                ML: interpolateQuadPoint(paperQuad, getLeftMiddleGuideRatio(), getMiddleGuideRatio()),
+                                MR: interpolateQuadPoint(paperQuad, getRightMiddleGuideRatio(), getMiddleGuideRatio())
                             };
                             fids = cam_executeFastFiducialTracker(gray, estFids, 40);
                         }
@@ -1311,7 +1406,7 @@
     function up_performDualWarp(src, fid) {
         let fullWarped = new cv.Mat(getWarpHeight(), getWarpWidth(), cv.CV_8UC4, new cv.Scalar(255,255,255,255));
         
-        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di getMiddleRatio())
+        // PERBAIKAN: Rasio LJK fisik mutlak (Fiducial tengah persis di getMiddleGuideRatio())
         let splitY = getSplitRows() * GRID_SIZE;
         let botHeight = getWarpHeight() - splitY;
 
@@ -1355,7 +1450,7 @@
                 for(let c = 0; c < gridCols; c++) {
                     let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
                     let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.floor(GRID_SIZE * 0.55); 
+                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale())); 
                     let roi = thresh.roi(new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize));
                     gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy }; roi.delete();
                 }
@@ -1608,7 +1703,7 @@
 </script>
 
 <script>
-window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":61,"fiducial_tengah_r":40,"preset_paper":"F4","preset_orientation":"P"},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":18},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN UJIAN ASTS GENAP\nSMP NEGERI 2 SECANG\nTAHUN PELAJARAN 2025/2026","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Mata Pelajaran :","c":21,"r":4,"w":15,"h":1},{"text":"Hari / Tanggal :","c":21,"r":5,"w":15,"h":1}]},"identitas":{"nama":{"visible":true,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":21,"r":8,"w":12,"h":11,"labels":["0","1","2","3","4","5","6","7","8","9","-"]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":34,"r":8,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":21,"blocks":[{"startSoal":1,"c":22,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":27,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":21,"blocks":[{"startSoal":21,"c":32,"rows":3,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":true,"title":"III. PG Benar-Salah","startRow":26,"blocks":[{"startSoal":24,"c":32,"rows":2,"options":2,"layout":"H","labels":["B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":33,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":33,"blocks":[{"startSoal":36,"c":25,"w":5,"rows":5,"h":1},{"startSoal":41,"c":31,"w":5,"rows":5,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":40,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":4}]}};
+window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":61,"fiducial_tengah_r":40,"fiducial_tengah_kiri_c":1,"fiducial_tengah_kanan_c":37,"preset_paper":"CUSTOM","preset_orientation":"P","paper_width_mm":215,"paper_height_mm":330,"margin_left_mm":5,"margin_top_mm":5,"margin_right_mm":5,"margin_bottom_mm":5},"pengaturan_arsiran":{"diameter_ratio":0.9,"stroke_width":0.5,"font_size":10,"font_weight":300},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":34},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN KOMPUTER (LJK)\nASESMEN SUMATIF AKHIR JENJANG","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Mata Pelajaran :","c":21,"r":4,"w":15,"h":1},{"text":"Hari / Tanggal :","c":21,"r":5,"w":15,"h":1}]},"identitas":{"nama":{"visible":true,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":21,"r":8,"w":7,"h":12,"labels":["0","1","2","3","4","5","6","7","8","9","T","-"]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":34,"r":8,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":21,"blocks":[{"startSoal":1,"c":22,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":27,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":21,"blocks":[{"startSoal":21,"c":32,"rows":3,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":true,"title":"III. PG Benar-Salah","startRow":25,"blocks":[{"startSoal":24,"c":32,"rows":2,"options":2,"layout":"H","labels":["B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":32,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":32,"blocks":[{"startSoal":36,"c":25,"w":5,"rows":5,"h":1},{"startSoal":41,"c":31,"w":5,"rows":5,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":38,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":4}]}};
 window.addEventListener('load', () => {
   try {
     if (window.ScannerApp?.applyLayoutConfig) {
