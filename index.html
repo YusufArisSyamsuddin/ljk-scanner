@@ -402,6 +402,28 @@
     function getBubbleSignalRatio() {
         return clampFloatValue(3.0 + (bubbleConfig.fontWeight >= 600 ? 0.08 : 0), 3.0, 2.8, 3.4);
     }
+    function getBubbleCenterSamplingScale() {
+        return clampFloatValue(getBubbleSamplingScale() * 0.58, 0.25, 0.2, 0.34);
+    }
+    function getBubbleCenterFillRatio() {
+        return clampFloatValue(
+            0.23 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.07 + Math.max(0, bubbleConfig.fontSize - 10) * 0.004,
+            0.23,
+            0.19,
+            0.3
+        );
+    }
+    function getBubbleCombinedFillRatio() {
+        return clampFloatValue(
+            0.19 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.08 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+            0.19,
+            0.17,
+            0.26
+        );
+    }
+    function getBubbleSoftGapRatio() {
+        return clampFloatValue(0.035 + (bubbleConfig.fontWeight >= 600 ? 0.005 : 0), 0.035, 0.025, 0.06);
+    }
     function interpolateQuadPoint(quad, u, v) {
         const top = { x: quad.TL.x + ((quad.TR.x - quad.TL.x) * u), y: quad.TL.y + ((quad.TR.y - quad.TL.y) * u) };
         const bottom = { x: quad.BL.x + ((quad.BR.x - quad.BL.x) * u), y: quad.BL.y + ((quad.BR.y - quad.BL.y) * u) };
@@ -474,10 +496,10 @@
     let camLastProcessTime = 0;
 
     const TRACK_INTERVAL_MS = 50;
-    const STABLE_FRAMES_TO_CAPTURE = 8;
-    const MIN_CONFIDENCE = 0.84; 
-    const MIN_SHARPNESS = 72; 
-    const MAX_MOVE_PX = 4.5; 
+    const STABLE_FRAMES_TO_CAPTURE = 9;
+    const MIN_CONFIDENCE = 0.90; 
+    const MIN_SHARPNESS = 90; 
+    const MAX_MOVE_PX = 3; 
     const TRACK_W = 500.0;
 
     const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas');
@@ -658,14 +680,6 @@
     const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> Engine OpenCV Siap'; } }, 500);
 
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-    function shared_clamp01(value) { return Math.max(0, Math.min(1, value)); }
-    function projectRatioOnSegment(point, start, end) {
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const lenSq = (dx * dx) + (dy * dy);
-        if (!lenSq) return 0;
-        return shared_clamp01((((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / lenSq);
-    }
 
     function normalizeStoredResultRow(row) {
         if (!row || typeof row !== 'object') return null;
@@ -720,7 +734,7 @@
 
     function shared_getGridCell(grid, row, col) {
         if (grid[row] && grid[row][col]) return grid[row][col];
-        return { density: 0, area: 1, cx: START_X + (col * GRID_SIZE) + (GRID_SIZE / 2), cy: START_Y + (row * GRID_SIZE) + (GRID_SIZE / 2) };
+        return { density: 0, area: 1, centerDensity: 0, centerArea: 1, cx: START_X + (col * GRID_SIZE) + (GRID_SIZE / 2), cy: START_Y + (row * GRID_SIZE) + (GRID_SIZE / 2) };
     }
 
     function shared_buildMetrics(opts) {
@@ -734,7 +748,13 @@
         return opts.map(opt => ({
             ...opt,
             fillRatio: opt.area ? (opt.d / opt.area) : 0,
-            marked: opt.area > 0 && (opt.d / Math.max(effectiveNoise, 1)) >= getBubbleSignalRatio() && (opt.d / opt.area) >= getBubbleMarkedFillRatio()
+            centerFillRatio: opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0,
+            combinedFillRatio: ((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.72) + ((opt.area ? (opt.d / opt.area) : 0) * 0.28),
+            signalRatio: opt.area > 0 ? (opt.d / Math.max(effectiveNoise, 1)) : 0,
+            marked: opt.area > 0
+                && (opt.d / Math.max(effectiveNoise, 1)) >= getBubbleSignalRatio()
+                && (((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.72) + ((opt.area ? (opt.d / opt.area) : 0) * 0.28)) >= getBubbleCombinedFillRatio()
+                && (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= getBubbleCenterFillRatio()
         }));
     }
 
@@ -767,11 +787,20 @@
     function shared_evaluateSingleChoice(opts, ctx, keyToken = null) {
         const metrics = shared_buildMetrics(opts);
         const marked = metrics.filter(opt => opt.marked);
-        const selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
+        const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
+        const best = ranked[0];
+        const second = ranked[1];
+        let selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
+        if (selected === '-' && best && second) {
+            const softEnough = best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.92)
+                && best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.9)
+                && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio();
+            if (softEnough) selected = best.v;
+        }
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
-        if (marked.length) {
+        if (marked.length || selected !== '-') {
             const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
-            marked.forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
+            (marked.length ? marked : [best]).filter(Boolean).forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
         }
         return selected;
     }
@@ -869,20 +898,23 @@
 
     function cam_computeConfidence(fids) {
         if(!fids || !fids.TL || !fids.TR || !fids.BL || !fids.BR || !fids.ML || !fids.MR) return 0;
-        let ratioL = projectRatioOnSegment(fids.ML, fids.TL, fids.BL);
-        let ratioR = projectRatioOnSegment(fids.MR, fids.TR, fids.BR);
+
+        let dLeftTotal = shared_dist(fids.TL, fids.BL);
+        let dLeftTop = shared_dist(fids.TL, fids.ML);
+        let dRightTotal = shared_dist(fids.TR, fids.BR);
+        let dRightTop = shared_dist(fids.TR, fids.MR);
+
+        if(dLeftTotal === 0 || dRightTotal === 0) return 0;
+
+        let ratioL = dLeftTop / dLeftTotal;
+        let ratioR = dRightTop / dRightTotal;
         let ratioDiff = Math.abs(ratioL - ratioR);
 
         let wTop = shared_dist(fids.TL, fids.TR);
         let wBot = shared_dist(fids.BL, fids.BR);
-        if (wTop === 0 || wBot === 0) return 0;
         let wRatio = Math.min(wTop, wBot) / Math.max(wTop, wBot); 
 
-        let edgeLeft = shared_dist(fids.TL, fids.BL);
-        let edgeRight = shared_dist(fids.TR, fids.BR);
-        let edgeRatio = Math.min(edgeLeft, edgeRight) / Math.max(edgeLeft, edgeRight);
-
-        let confidence = (1 - ratioDiff) * 0.6 + wRatio * 0.25 + edgeRatio * 0.15;
+        let confidence = (1 - ratioDiff) * 0.7 + (wRatio) * 0.3;
         return Math.max(0, Math.min(1, confidence));
     }
 
@@ -1061,17 +1093,32 @@
 
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
+            let threshSoft = new cv.Mat();
+            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 61, 12);
+            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
+            kernelSoft.delete();
             let gridData = [];
             for(let r = 0; r < gridRows; r++) {
                 gridData[r] = [];
                 for(let c = 0; c < gridCols; c++) {
                     let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
                     let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale())); 
-                    let roi = thresh.roi(new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize));
-                    gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy }; roi.delete();
+                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale()));
+                    let centerSize = Math.max(6, Math.floor(GRID_SIZE * getBubbleCenterSamplingScale()));
+                    let coreRect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
+                    let centerRect = new cv.Rect(Math.floor(cx - (centerSize / 2)), Math.floor(cy - (centerSize / 2)), centerSize, centerSize);
+                    let roiMain = thresh.roi(coreRect);
+                    let roiSoft = threshSoft.roi(coreRect);
+                    let roiCenterMain = thresh.roi(centerRect);
+                    let roiCenterSoft = threshSoft.roi(centerRect);
+                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.68) + (cv.countNonZero(roiSoft) * 0.32));
+                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.75) + (cv.countNonZero(roiCenterSoft) * 0.25));
+                    gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
+                    roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
                 }
             }
+            threshSoft.delete();
 
             let testNameDensity = shared_probeIdentityDensity(gridData);
             if (testNameDensity < 50) return false; 
@@ -1251,9 +1298,6 @@
                     ctx.strokeRect(uiGuidePts.TR.x - boxSize/2, uiGuidePts.TR.y - boxSize/2, boxSize, boxSize);
                     ctx.strokeRect(uiGuidePts.BL.x - boxSize/2, uiGuidePts.BL.y - boxSize/2, boxSize, boxSize);
                     ctx.strokeRect(uiGuidePts.BR.x - boxSize/2, uiGuidePts.BR.y - boxSize/2, boxSize, boxSize);
-                    const midBox = Math.max(28, boxSize * 0.8);
-                    ctx.strokeRect(uiGuidePts.ML.x - midBox/2, uiGuidePts.ML.y - midBox/2, midBox, midBox);
-                    ctx.strokeRect(uiGuidePts.MR.x - midBox/2, uiGuidePts.MR.y - midBox/2, midBox, midBox);
                     ctx.setLineDash([]);
 
                     if (fids) {
@@ -1270,8 +1314,7 @@
                         camLastFids = cam_smoothFids(camLastFids, fids, 0.7);
 
                         let stabPercent = Math.min(100, Math.round((camStableFrames / STABLE_FRAMES_TO_CAPTURE) * 100));
-                        let qualityText = `Conf ${Math.round(conf * 100)}% | Fokus ${Math.round(sharpness)}`;
-                        scanStatus.innerHTML = `<span class="text-emerald-500 font-bold">STABIL ${stabPercent}%</span> <span class="text-slate-400 font-medium">${qualityText}</span>`;
+                        scanStatus.innerHTML = `<span class="text-emerald-500 font-bold">STABIL ${stabPercent}%</span>`;
 
                         ctx.beginPath();
                         ctx.moveTo(camLastFids.TL.x / scale, camLastFids.TL.y / scale);
@@ -1498,17 +1541,32 @@
 
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
+            let threshSoft = new cv.Mat();
+            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 61, 12);
+            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
+            kernelSoft.delete();
             let gridData = [];
             for(let r = 0; r < gridRows; r++) {
                 gridData[r] = [];
                 for(let c = 0; c < gridCols; c++) {
                     let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
                     let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale())); 
-                    let roi = thresh.roi(new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize));
-                    gridData[r][c] = { density: cv.countNonZero(roi), area: coreSize * coreSize, cx: cx, cy: cy }; roi.delete();
+                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale()));
+                    let centerSize = Math.max(6, Math.floor(GRID_SIZE * getBubbleCenterSamplingScale()));
+                    let coreRect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
+                    let centerRect = new cv.Rect(Math.floor(cx - (centerSize / 2)), Math.floor(cy - (centerSize / 2)), centerSize, centerSize);
+                    let roiMain = thresh.roi(coreRect);
+                    let roiSoft = threshSoft.roi(coreRect);
+                    let roiCenterMain = thresh.roi(centerRect);
+                    let roiCenterSoft = threshSoft.roi(centerRect);
+                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.68) + (cv.countNonZero(roiSoft) * 0.32));
+                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.75) + (cv.countNonZero(roiCenterSoft) * 0.25));
+                    gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
+                    roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
                 }
             }
+            threshSoft.delete();
 
             let testNameDensity = shared_probeIdentityDensity(gridData);
             if (testNameDensity < 50) return false; 
