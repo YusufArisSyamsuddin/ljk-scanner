@@ -462,6 +462,7 @@
     const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
     const NUMBERS = "0123456789-".split('');
     const KELAS_VALS = ['7','8','9','A','B','C','D','E','F','G','H','T'];
+    const RESULT_STORAGE_KEY = 'ljk-suite-scan-results-v1';
 
     let resultData = [], scanCounter = 1, videoScanLoop = null;
     let isProcessing = false; 
@@ -473,10 +474,10 @@
     let camLastProcessTime = 0;
 
     const TRACK_INTERVAL_MS = 50;
-    const STABLE_FRAMES_TO_CAPTURE = 9;
-    const MIN_CONFIDENCE = 0.90; 
-    const MIN_SHARPNESS = 90; 
-    const MAX_MOVE_PX = 3; 
+    const STABLE_FRAMES_TO_CAPTURE = 8;
+    const MIN_CONFIDENCE = 0.84; 
+    const MIN_SHARPNESS = 72; 
+    const MAX_MOVE_PX = 4.5; 
     const TRACK_W = 500.0;
 
     const video = document.getElementById('video'), overlayCanvas = document.getElementById('overlay-canvas');
@@ -657,6 +658,54 @@
     const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> Engine OpenCV Siap'; } }, 500);
 
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function shared_clamp01(value) { return Math.max(0, Math.min(1, value)); }
+    function projectRatioOnSegment(point, start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lenSq = (dx * dx) + (dy * dy);
+        if (!lenSq) return 0;
+        return shared_clamp01((((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / lenSq);
+    }
+
+    function normalizeStoredResultRow(row) {
+        if (!row || typeof row !== 'object') return null;
+        const id = Number(row.id);
+        if (!Number.isFinite(id)) return null;
+        return {
+            id,
+            name: String(row.name || '-').toUpperCase(),
+            kelas: String(row.kelas || '-').toUpperCase(),
+            peserta: String(row.peserta || '-').toUpperCase(),
+            trueCount: Number(row.trueCount) || 0,
+            falseCount: Number(row.falseCount) || 0,
+            emptyCount: Number(row.emptyCount) || 0,
+            answers: Array.isArray(row.answers) ? row.answers.map(v => String(v)) : [],
+            correctNumbers: Array.isArray(row.correctNumbers) ? row.correctNumbers.map(v => String(v)) : [],
+            wrongNumbers: Array.isArray(row.wrongNumbers) ? row.wrongNumbers.map(v => String(v)) : []
+        };
+    }
+
+    function loadStoredResults() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(RESULT_STORAGE_KEY) || '[]');
+            return Array.isArray(raw) ? raw.map(normalizeStoredResultRow).filter(Boolean) : [];
+        } catch (err) {
+            console.warn('Gagal membaca rekap hasil tersimpan:', err);
+            return [];
+        }
+    }
+
+    function persistResults() {
+        try {
+            localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(resultData));
+        } catch (err) {
+            console.warn('Gagal menyimpan rekap hasil:', err);
+        }
+    }
+
+    function formatSectionList(items) {
+        return Array.isArray(items) && items.length ? items.join(' | ') : '-';
+    }
     
     function shared_orderPoints(pts) {
         let cx = pts.reduce((sum, p) => sum + p.x, 0) / 4;
@@ -783,6 +832,8 @@
         getVisibleAnswerSections().forEach(section => {
             const sectionKeys = keyMap[section.id] || [];
             const sectionAnswers = [];
+            const sectionCorrect = [];
+            const sectionWrong = [];
             section.questions.forEach((question, index) => {
                 if (index >= sectionKeys.length) return;
                 const opts = question.options.map(option => {
@@ -802,13 +853,15 @@
                     emptyCount++;
                 } else if (detected === keyToken) {
                     trueCount++;
-                    correctNumbers.push(numberLabel);
+                    sectionCorrect.push(question.number);
                 } else {
                     falseCount++;
-                    wrongNumbers.push(numberLabel);
+                    sectionWrong.push(question.number);
                 }
             });
             if (sectionAnswers.length) answers.push(`${section.short}: ${sectionAnswers.join(', ')}`);
+            if (sectionCorrect.length) correctNumbers.push(`${section.short}: ${sectionCorrect.join(', ')}`);
+            if (sectionWrong.length) wrongNumbers.push(`${section.short}: ${sectionWrong.join(', ')}`);
         });
 
         return { trueCount, falseCount, emptyCount, answers, correctNumbers, wrongNumbers };
@@ -816,23 +869,20 @@
 
     function cam_computeConfidence(fids) {
         if(!fids || !fids.TL || !fids.TR || !fids.BL || !fids.BR || !fids.ML || !fids.MR) return 0;
-        
-        let dLeftTotal = shared_dist(fids.TL, fids.BL);
-        let dLeftTop = shared_dist(fids.TL, fids.ML);
-        let dRightTotal = shared_dist(fids.TR, fids.BR);
-        let dRightTop = shared_dist(fids.TR, fids.MR);
-
-        if(dLeftTotal === 0 || dRightTotal === 0) return 0;
-
-        let ratioL = dLeftTop / dLeftTotal;
-        let ratioR = dRightTop / dRightTotal;
+        let ratioL = projectRatioOnSegment(fids.ML, fids.TL, fids.BL);
+        let ratioR = projectRatioOnSegment(fids.MR, fids.TR, fids.BR);
         let ratioDiff = Math.abs(ratioL - ratioR);
 
         let wTop = shared_dist(fids.TL, fids.TR);
         let wBot = shared_dist(fids.BL, fids.BR);
+        if (wTop === 0 || wBot === 0) return 0;
         let wRatio = Math.min(wTop, wBot) / Math.max(wTop, wBot); 
 
-        let confidence = (1 - ratioDiff) * 0.7 + (wRatio) * 0.3;
+        let edgeLeft = shared_dist(fids.TL, fids.BL);
+        let edgeRight = shared_dist(fids.TR, fids.BR);
+        let edgeRatio = Math.min(edgeLeft, edgeRight) / Math.max(edgeLeft, edgeRight);
+
+        let confidence = (1 - ratioDiff) * 0.6 + wRatio * 0.25 + edgeRatio * 0.15;
         return Math.max(0, Math.min(1, confidence));
     }
 
@@ -1201,6 +1251,9 @@
                     ctx.strokeRect(uiGuidePts.TR.x - boxSize/2, uiGuidePts.TR.y - boxSize/2, boxSize, boxSize);
                     ctx.strokeRect(uiGuidePts.BL.x - boxSize/2, uiGuidePts.BL.y - boxSize/2, boxSize, boxSize);
                     ctx.strokeRect(uiGuidePts.BR.x - boxSize/2, uiGuidePts.BR.y - boxSize/2, boxSize, boxSize);
+                    const midBox = Math.max(28, boxSize * 0.8);
+                    ctx.strokeRect(uiGuidePts.ML.x - midBox/2, uiGuidePts.ML.y - midBox/2, midBox, midBox);
+                    ctx.strokeRect(uiGuidePts.MR.x - midBox/2, uiGuidePts.MR.y - midBox/2, midBox, midBox);
                     ctx.setLineDash([]);
 
                     if (fids) {
@@ -1217,7 +1270,8 @@
                         camLastFids = cam_smoothFids(camLastFids, fids, 0.7);
 
                         let stabPercent = Math.min(100, Math.round((camStableFrames / STABLE_FRAMES_TO_CAPTURE) * 100));
-                        scanStatus.innerHTML = `<span class="text-emerald-500 font-bold">STABIL ${stabPercent}%</span>`;
+                        let qualityText = `Conf ${Math.round(conf * 100)}% | Fokus ${Math.round(sharpness)}`;
+                        scanStatus.innerHTML = `<span class="text-emerald-500 font-bold">STABIL ${stabPercent}%</span> <span class="text-slate-400 font-medium">${qualityText}</span>`;
 
                         ctx.beginPath();
                         ctx.moveTo(camLastFids.TL.x / scale, camLastFids.TL.y / scale);
@@ -1592,12 +1646,17 @@
                 <td class="p-4 text-emerald-600 font-bold">${d.trueCount}</td>
                 <td class="p-4 text-red-600 font-bold">${d.falseCount}</td>
                 <td class="p-4 text-slate-600 font-bold">${d.emptyCount}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.correctNumbers.join(', ')}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[150px]">${d.wrongNumbers.join(', ')}</td>
-                <td class="p-4 text-slate-800 font-mono text-xs tracking-widest">${d.answers.join(' | ')}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[170px]">${formatSectionList(d.correctNumbers)}</td>
+                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[170px]">${formatSectionList(d.wrongNumbers)}</td>
+                <td class="p-4 text-slate-800 font-mono text-xs tracking-widest">${formatSectionList(d.answers)}</td>
             `; tbody.appendChild(tr);
         });
+        persistResults();
     }
+
+    resultData = loadStoredResults();
+    scanCounter = resultData.reduce((maxId, row) => Math.max(maxId, Number(row.id) || 0), 0) + 1;
+    updateTable();
 
     document.getElementById('result-table-body').addEventListener('click', e => {
         let btn = e.target.closest('.btn-delete'); if (btn) showDeleteConfirm(parseInt(btn.getAttribute('data-id'))); 
@@ -1676,7 +1735,7 @@
 
     document.getElementById('btn-export').addEventListener('click', () => {
         if (!resultData.length) return showCustomAlert("Belum ada hasil pemindaian untuk diekspor.");
-        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama": d.name, "Kelas": d.kelas, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Benar": d.correctNumbers.join(', '), "Detail Salah": d.wrongNumbers.join(', '), "Jawaban": d.answers.join(' | ') })));
+        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama": d.name, "Kelas": d.kelas, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Benar": formatSectionList(d.correctNumbers), "Detail Salah": formatSectionList(d.wrongNumbers), "Jawaban": formatSectionList(d.answers) })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap LJK");
         XLSX.writeFile(wb, `Rekap_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
