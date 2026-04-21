@@ -92,9 +92,14 @@
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 mb-4 gap-4">
             <h2 class="font-bold text-xl text-slate-800">Rekap Hasil Pemindaian</h2>
-            <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
-                Unduh Excel
-            </button>
+            <div class="flex flex-wrap gap-2">
+                <button id="btn-clear-results" class="bg-white border border-red-200 text-red-600 hover:bg-red-50 px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
+                    Hapus
+                </button>
+                <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2">
+                    Unduh Excel
+                </button>
+            </div>
         </div>
         <div class="overflow-x-auto rounded-lg border border-slate-200">
             <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
@@ -107,7 +112,7 @@
                         <th class="p-4 font-bold">Nomor Peserta</th>
                         <th class="p-4 font-bold text-emerald-500">Benar</th>
                         <th class="p-4 font-bold text-red-500">Salah</th>
-                        <th class="p-4 font-bold text-slate-500">Kosong</th>
+                        <th class="p-4 font-bold text-sky-500">Nilai</th>
                         <th class="p-4 font-bold text-emerald-600">Nomor Benar</th>
                         <th class="p-4 font-bold text-red-600">Nomor Salah</th>
                         <th class="p-4 font-bold text-slate-700">Jawaban Terdeteksi</th>
@@ -221,8 +226,8 @@
     <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75"></div>
     <div class="modal-container bg-white w-11/12 md:max-w-sm mx-auto rounded-xl shadow-2xl z-50 overflow-hidden text-center p-6">
         <svg class="mx-auto mb-4 text-red-500 w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-        <h3 class="text-lg font-black text-slate-800 mb-2">Hapus Hasil</h3>
-        <p class="text-sm text-slate-600 mb-5">Apakah Anda yakin ingin menghapus hasil pemindaian ini dari tabel rekap?</p>
+        <h3 id="confirm-title" class="text-lg font-black text-slate-800 mb-2">Hapus Hasil</h3>
+        <p id="confirm-message" class="text-sm text-slate-600 mb-5">Apakah Anda yakin ingin menghapus hasil pemindaian ini dari tabel rekap?</p>
         <div class="flex gap-3 justify-center">
             <button onclick="closeModal('confirm-modal')" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200 transition">Batal</button>
             <button id="btn-confirm-delete" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-bold shadow hover:bg-red-700 transition">Hapus</button>
@@ -385,44 +390,44 @@
     function getRightMiddleGuideRatio() { return clampFloatValue(paperConfig.fiducialMiddleRightCol / Math.max(1, paperConfig.gridCols), 0.97, 0.6, 0.99); }
     function getBubbleSamplingScale() {
         return clampFloatValue(
-            0.40 + ((bubbleConfig.diameterRatio - 0.72) * 0.22) - (Math.max(0, bubbleConfig.fontSize - 10) * 0.008) - (bubbleConfig.fontWeight >= 600 ? 0.01 : 0),
-            0.42,
-            0.34,
-            0.48
+            0.43 + ((bubbleConfig.diameterRatio - 0.72) * 0.18) - (Math.max(0, bubbleConfig.fontSize - 10) * 0.006) - (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
+            0.43,
+            0.38,
+            0.5
         );
     }
     function getBubbleMarkedFillRatio() {
         return clampFloatValue(
-            0.18 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.10 + Math.max(0, bubbleConfig.fontSize - 10) * 0.004 + (bubbleConfig.fontWeight >= 600 ? 0.01 : 0),
-            0.18,
-            0.17,
-            0.24
+            0.14 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003 + (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
+            0.14,
+            0.13,
+            0.2
         );
     }
     function getBubbleSignalRatio() {
-        return clampFloatValue(3.0 + (bubbleConfig.fontWeight >= 600 ? 0.08 : 0), 3.0, 2.8, 3.4);
+        return clampFloatValue(2.45 + (bubbleConfig.fontWeight >= 600 ? 0.06 : 0), 2.45, 2.25, 3.1);
     }
     function getBubbleCenterSamplingScale() {
-        return clampFloatValue(getBubbleSamplingScale() * 0.58, 0.25, 0.2, 0.34);
+        return clampFloatValue(getBubbleSamplingScale() * 0.64, 0.28, 0.24, 0.38);
     }
     function getBubbleCenterFillRatio() {
         return clampFloatValue(
-            0.23 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.07 + Math.max(0, bubbleConfig.fontSize - 10) * 0.004,
-            0.23,
-            0.19,
-            0.3
+            0.17 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.05 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+            0.17,
+            0.14,
+            0.25
         );
     }
     function getBubbleCombinedFillRatio() {
         return clampFloatValue(
-            0.19 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.08 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
-            0.19,
-            0.17,
-            0.26
+            0.145 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+            0.145,
+            0.13,
+            0.22
         );
     }
     function getBubbleSoftGapRatio() {
-        return clampFloatValue(0.035 + (bubbleConfig.fontWeight >= 600 ? 0.005 : 0), 0.035, 0.025, 0.06);
+        return clampFloatValue(0.022 + (bubbleConfig.fontWeight >= 600 ? 0.004 : 0), 0.022, 0.018, 0.05);
     }
     function interpolateQuadPoint(quad, u, v) {
         const top = { x: quad.TL.x + ((quad.TR.x - quad.TL.x) * u), y: quad.TL.y + ((quad.TR.y - quad.TL.y) * u) };
@@ -488,7 +493,7 @@
 
     let resultData = [], scanCounter = 1, videoScanLoop = null;
     let isProcessing = false; 
-    let pendingUpdateData = null, pendingUpdateIndex = -1, pendingDeleteId = null;
+    let pendingUpdateData = null, pendingUpdateIndex = -1, pendingDeleteId = null, pendingDeleteAll = false;
 
     let camStableFrames = 0;
     let camLostFrames = 0;
@@ -507,9 +512,22 @@
     const scanStatus = document.getElementById('scan-status');
 
     function openModal(id) { document.getElementById(id).classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); }
-    function closeModal(id) { document.getElementById(id).classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); if(id === 'result-modal'){ pendingUpdateData = null; pendingUpdateIndex = -1; } if(id === 'confirm-modal'){ pendingDeleteId = null; } }
+    function closeModal(id) { document.getElementById(id).classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); if(id === 'result-modal'){ pendingUpdateData = null; pendingUpdateIndex = -1; } if(id === 'confirm-modal'){ pendingDeleteId = null; pendingDeleteAll = false; } }
     function showCustomAlert(msg) { document.getElementById('alert-message').innerText = msg; openModal('alert-modal'); }
-    function showDeleteConfirm(id) { pendingDeleteId = id; openModal('confirm-modal'); }
+    function showDeleteConfirm(id) {
+        pendingDeleteId = id;
+        pendingDeleteAll = false;
+        document.getElementById('confirm-title').innerText = 'Hapus Hasil';
+        document.getElementById('confirm-message').innerText = 'Apakah Anda yakin ingin menghapus hasil pemindaian ini dari tabel rekap?';
+        openModal('confirm-modal');
+    }
+    function showDeleteAllConfirm() {
+        pendingDeleteId = null;
+        pendingDeleteAll = true;
+        document.getElementById('confirm-title').innerText = 'Hapus Seluruh Rekap';
+        document.getElementById('confirm-message').innerText = 'Apakah Anda yakin ingin menghapus seluruh isi tabel Rekap Hasil Pemindaian?';
+        openModal('confirm-modal');
+    }
 
     function defaultSectionLabels(sectionId, optionCount) {
         if (sectionId === 'jawaban_bs') return ['B', 'S'];
@@ -565,6 +583,11 @@
         const host = document.getElementById('answer-key-panels');
         if (!host) return;
         const sections = getVisibleAnswerSections();
+        const visibleIds = new Set(sections.map(section => section.id));
+        Object.keys(answerKeyState).forEach(sectionId => {
+            if (!visibleIds.has(sectionId)) delete answerKeyState[sectionId];
+        });
+        persistAnswerKeys();
         if (!sections.length) {
             host.innerHTML = '<div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] font-semibold text-slate-500">Belum ada blok soal yang aktif pada desain untuk diberi kunci jawaban.</div>';
             updateAnswerKeyHeader();
@@ -681,28 +704,76 @@
 
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
-    function normalizeStoredResultRow(row) {
+    function createRecordId() {
+        return `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function normalizeDisplayText(value, fallback = '-') {
+        if (Array.isArray(value)) {
+            const parts = value.map(v => String(v).trim()).filter(Boolean);
+            return parts.length ? parts.join(' | ') : fallback;
+        }
+        const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+        return text || fallback;
+    }
+
+    function deriveSectionCountSummary(value) {
+        const text = normalizeDisplayText(value, '');
+        if (!text) return '';
+        const parts = text.split('|').map(part => part.trim()).filter(Boolean);
+        const summary = parts.map(part => {
+            const match = part.match(/^([^:]+):\s*(.*)$/);
+            if (!match) return null;
+            const label = match[1].trim().toUpperCase();
+            const items = match[2].split(',').map(item => item.trim()).filter(Boolean);
+            return `${label}: ${items.length}`;
+        }).filter(Boolean);
+        return summary.length ? summary.join(' | ') : '';
+    }
+
+    function formatScoreValue(value, questionCount = 0, trueCount = 0) {
+        const parsed = Number(String(value ?? '').replace(',', '.'));
+        const score = Number.isFinite(parsed) ? parsed : (questionCount > 0 ? (trueCount / questionCount) * 100 : 0);
+        if (!Number.isFinite(score)) return '0';
+        return score.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    }
+
+    function formatSectionList(items) {
+        return normalizeDisplayText(items);
+    }
+
+    function normalizeStoredResultRow(row, index = 0) {
         if (!row || typeof row !== 'object') return null;
-        const id = Number(row.id);
-        if (!Number.isFinite(id)) return null;
+        const trueCount = Number(row.trueCount) || 0;
+        const falseCount = Number(row.falseCount) || 0;
+        const emptyCount = Number(row.emptyCount) || 0;
+        const questionCount = Math.max(0, Number(row.questionCount) || (trueCount + falseCount + emptyCount));
+        const sectionTrueCounts = normalizeDisplayText(
+            row.sectionTrueCounts || row.trueCountBySection || deriveSectionCountSummary(row.correctNumbers) || (questionCount ? `TOTAL: ${trueCount}` : ''),
+            '-'
+        );
         return {
-            id,
+            recordId: String(row.recordId || createRecordId()),
+            id: String(row.id ?? (index + 1)).trim() || String(index + 1),
             name: String(row.name || '-').toUpperCase(),
             kelas: String(row.kelas || '-').toUpperCase(),
             peserta: String(row.peserta || '-').toUpperCase(),
-            trueCount: Number(row.trueCount) || 0,
-            falseCount: Number(row.falseCount) || 0,
-            emptyCount: Number(row.emptyCount) || 0,
-            answers: Array.isArray(row.answers) ? row.answers.map(v => String(v)) : [],
-            correctNumbers: Array.isArray(row.correctNumbers) ? row.correctNumbers.map(v => String(v)) : [],
-            wrongNumbers: Array.isArray(row.wrongNumbers) ? row.wrongNumbers.map(v => String(v)) : []
+            trueCount,
+            falseCount,
+            emptyCount,
+            questionCount,
+            scoreValue: formatScoreValue(row.scoreValue, questionCount, trueCount),
+            sectionTrueCounts,
+            answers: normalizeDisplayText(row.answers),
+            correctNumbers: normalizeDisplayText(row.correctNumbers),
+            wrongNumbers: normalizeDisplayText(row.wrongNumbers)
         };
     }
 
     function loadStoredResults() {
         try {
             const raw = JSON.parse(localStorage.getItem(RESULT_STORAGE_KEY) || '[]');
-            return Array.isArray(raw) ? raw.map(normalizeStoredResultRow).filter(Boolean) : [];
+            return Array.isArray(raw) ? raw.map((row, index) => normalizeStoredResultRow(row, index)).filter(Boolean) : [];
         } catch (err) {
             console.warn('Gagal membaca rekap hasil tersimpan:', err);
             return [];
@@ -717,10 +788,6 @@
         }
     }
 
-    function formatSectionList(items) {
-        return Array.isArray(items) && items.length ? items.join(' | ') : '-';
-    }
-    
     function shared_orderPoints(pts) {
         let cx = pts.reduce((sum, p) => sum + p.x, 0) / 4;
         let cy = pts.reduce((sum, p) => sum + p.y, 0) / 4;
@@ -749,12 +816,18 @@
             ...opt,
             fillRatio: opt.area ? (opt.d / opt.area) : 0,
             centerFillRatio: opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0,
-            combinedFillRatio: ((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.72) + ((opt.area ? (opt.d / opt.area) : 0) * 0.28),
+            combinedFillRatio: ((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.64) + ((opt.area ? (opt.d / opt.area) : 0) * 0.36),
             signalRatio: opt.area > 0 ? (opt.d / Math.max(effectiveNoise, 1)) : 0,
             marked: opt.area > 0
                 && (opt.d / Math.max(effectiveNoise, 1)) >= getBubbleSignalRatio()
-                && (((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.72) + ((opt.area ? (opt.d / opt.area) : 0) * 0.28)) >= getBubbleCombinedFillRatio()
-                && (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= getBubbleCenterFillRatio()
+                && (((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.64) + ((opt.area ? (opt.d / opt.area) : 0) * 0.36)) >= getBubbleCombinedFillRatio()
+                && (
+                    (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= getBubbleCenterFillRatio()
+                    || (
+                        (opt.area ? (opt.d / opt.area) : 0) >= getBubbleMarkedFillRatio()
+                        && (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= (getBubbleCenterFillRatio() * 0.78)
+                    )
+                )
         }));
     }
 
@@ -792,9 +865,14 @@
         const second = ranked[1];
         let selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
         if (selected === '-' && best && second) {
-            const softEnough = best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.92)
-                && best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.9)
-                && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio();
+            const softEnough = best.signalRatio >= (getBubbleSignalRatio() * 0.82)
+                && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.9)
+                && (
+                    best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.74)
+                    || best.fillRatio >= (getBubbleMarkedFillRatio() * 1.02)
+                )
+                && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio()
+                && (best.signalRatio - second.signalRatio) >= 0.12;
             if (softEnough) selected = best.v;
         }
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
@@ -807,8 +885,33 @@
 
     function shared_evaluateMultiChoice(opts, ctx, keyToken = '') {
         const metrics = shared_buildMetrics(opts);
-        const marked = metrics.filter(opt => opt.marked);
-        const selected = marked.length ? opts.filter(opt => marked.some(mark => mark.v === opt.v)).map(opt => String(opt.v).toUpperCase()).join('') : '-';
+        const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
+        const expectedCount = Math.max(1, String(keyToken || '').length);
+        const best = ranked[0];
+        let marked = metrics.filter(opt => opt.marked);
+
+        const softCandidates = ranked.filter((opt, index) => {
+            if (marked.some(mark => mark.v === opt.v)) return false;
+            if (index >= Math.max(expectedCount + 1, 3)) return false;
+            const signalEnough = opt.signalRatio >= (getBubbleSignalRatio() * 0.76);
+            const combinedEnough = opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.86);
+            const fillEnough = opt.centerFillRatio >= (getBubbleCenterFillRatio() * 0.7)
+                || opt.fillRatio >= (getBubbleMarkedFillRatio() * 1.02);
+            const closeToBest = best
+                ? (opt.combinedFillRatio >= (best.combinedFillRatio * 0.74) || opt.signalRatio >= (best.signalRatio * 0.74))
+                : false;
+            return signalEnough && combinedEnough && fillEnough && closeToBest;
+        });
+
+        if (!marked.length && softCandidates.length) {
+            marked = softCandidates.slice(0, Math.max(expectedCount, 2));
+        } else if (marked.length < expectedCount && softCandidates.length) {
+            marked = [...marked, ...softCandidates.slice(0, expectedCount - marked.length)];
+        }
+
+        const selected = marked.length
+            ? opts.filter(opt => marked.some(mark => mark.v === opt.v)).map(opt => String(opt.v).toUpperCase()).join('')
+            : '-';
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, keyToken.split(''));
         if (marked.length) {
             const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
@@ -856,32 +959,43 @@
         const answers = [];
         const correctNumbers = [];
         const wrongNumbers = [];
-        let trueCount = 0, falseCount = 0, emptyCount = 0;
+        const sectionTrueCounts = [];
+        let trueCount = 0, falseCount = 0, emptyCount = 0, questionCount = 0;
 
         getVisibleAnswerSections().forEach(section => {
             const sectionKeys = keyMap[section.id] || [];
             const sectionAnswers = [];
             const sectionCorrect = [];
             const sectionWrong = [];
+            let sectionTrueCount = 0;
             section.questions.forEach((question, index) => {
                 if (index >= sectionKeys.length) return;
                 const opts = question.options.map(option => {
                     const cell = shared_getGridCell(grid, designerToGridRow(option.r), designerToGridCol(option.c));
-                    return { v: String(option.v).toUpperCase(), d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy };
+                    return {
+                        v: String(option.v).toUpperCase(),
+                        d: cell.density,
+                        area: cell.area,
+                        centerDensity: cell.centerDensity,
+                        centerArea: cell.centerArea,
+                        cx: cell.cx,
+                        cy: cell.cy
+                    };
                 });
                 const keyToken = section.mode === 'multi'
                     ? normalizeTokenForOrder(sectionKeys[index] || '', opts.map(opt => opt.v))
                     : String(sectionKeys[index] || '').toUpperCase().trim();
                 if (!keyToken) return;
+                questionCount++;
                 const detected = section.mode === 'multi'
                     ? shared_evaluateMultiChoice(opts, ctx, keyToken)
                     : shared_evaluateSingleChoice(opts, ctx, keyToken);
                 sectionAnswers.push(`${question.number}-${detected}`);
-                const numberLabel = `${question.shortLabel} ${question.number}`;
                 if (detected === '-' || detected === '*') {
                     emptyCount++;
                 } else if (detected === keyToken) {
                     trueCount++;
+                    sectionTrueCount++;
                     sectionCorrect.push(question.number);
                 } else {
                     falseCount++;
@@ -889,11 +1003,22 @@
                 }
             });
             if (sectionAnswers.length) answers.push(`${section.short}: ${sectionAnswers.join(', ')}`);
+            if (sectionKeys.length) sectionTrueCounts.push(`${section.short}: ${sectionTrueCount}`);
             if (sectionCorrect.length) correctNumbers.push(`${section.short}: ${sectionCorrect.join(', ')}`);
             if (sectionWrong.length) wrongNumbers.push(`${section.short}: ${sectionWrong.join(', ')}`);
         });
 
-        return { trueCount, falseCount, emptyCount, answers, correctNumbers, wrongNumbers };
+        return {
+            trueCount,
+            falseCount,
+            emptyCount,
+            questionCount,
+            scoreValue: questionCount > 0 ? ((trueCount / questionCount) * 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') : '0',
+            sectionTrueCounts,
+            answers,
+            correctNumbers,
+            wrongNumbers
+        };
     }
 
     function cam_computeConfidence(fids) {
@@ -1094,8 +1219,8 @@
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
             let threshSoft = new cv.Mat();
-            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 61, 12);
-            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 8);
+            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
             cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
             kernelSoft.delete();
             let gridData = [];
@@ -1112,8 +1237,8 @@
                     let roiSoft = threshSoft.roi(coreRect);
                     let roiCenterMain = thresh.roi(centerRect);
                     let roiCenterSoft = threshSoft.roi(centerRect);
-                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.68) + (cv.countNonZero(roiSoft) * 0.32));
-                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.75) + (cv.countNonZero(roiCenterSoft) * 0.25));
+                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.52) + (cv.countNonZero(roiSoft) * 0.48));
+                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.6) + (cv.countNonZero(roiCenterSoft) * 0.4));
                     gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
                     roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
                 }
@@ -1134,9 +1259,18 @@
             let scoreData = shared_gradeAnswers(gridData, ctx, keyInfo.keys);
 
             let existingIndex = resultData.findIndex(d => d.peserta === peserta && d.kelas === kelas && peserta !== "-");
-            let dataRow = { name, kelas, peserta, ...scoreData };
-            if (existingIndex !== -1) { dataRow.id = resultData[existingIndex].id; showPopupResult(dataRow, true, existingIndex); } 
-            else { dataRow.id = scanCounter++; resultData.push(dataRow); showPopupResult(dataRow, false); updateTable(); }
+            let dataRow = normalizeStoredResultRow({ name, kelas, peserta, ...scoreData });
+            if (existingIndex !== -1) {
+                dataRow.recordId = resultData[existingIndex].recordId;
+                dataRow.id = resultData[existingIndex].id;
+                showPopupResult(dataRow, true, existingIndex);
+            } else {
+                dataRow.recordId = createRecordId();
+                dataRow.id = String(scanCounter++);
+                resultData.push(dataRow);
+                showPopupResult(dataRow, false);
+                updateTable();
+            }
             
             return true; 
         } finally {
@@ -1542,8 +1676,8 @@
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
             let threshSoft = new cv.Mat();
-            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 61, 12);
-            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 8);
+            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
             cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
             kernelSoft.delete();
             let gridData = [];
@@ -1560,8 +1694,8 @@
                     let roiSoft = threshSoft.roi(coreRect);
                     let roiCenterMain = thresh.roi(centerRect);
                     let roiCenterSoft = threshSoft.roi(centerRect);
-                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.68) + (cv.countNonZero(roiSoft) * 0.32));
-                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.75) + (cv.countNonZero(roiCenterSoft) * 0.25));
+                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.52) + (cv.countNonZero(roiSoft) * 0.48));
+                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.6) + (cv.countNonZero(roiCenterSoft) * 0.4));
                     gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
                     roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
                 }
@@ -1582,9 +1716,18 @@
             let scoreData = shared_gradeAnswers(gridData, ctx, keyInfo.keys);
 
             let existingIndex = resultData.findIndex(d => d.peserta === peserta && d.kelas === kelas && peserta !== "-");
-            let dataRow = { name, kelas, peserta, ...scoreData };
-            if (existingIndex !== -1) { dataRow.id = resultData[existingIndex].id; showPopupResult(dataRow, true, existingIndex); } 
-            else { dataRow.id = scanCounter++; resultData.push(dataRow); showPopupResult(dataRow, false); updateTable(); }
+            let dataRow = normalizeStoredResultRow({ name, kelas, peserta, ...scoreData });
+            if (existingIndex !== -1) {
+                dataRow.recordId = resultData[existingIndex].recordId;
+                dataRow.id = resultData[existingIndex].id;
+                showPopupResult(dataRow, true, existingIndex);
+            } else {
+                dataRow.recordId = createRecordId();
+                dataRow.id = String(scanCounter++);
+                resultData.push(dataRow);
+                showPopupResult(dataRow, false);
+                updateTable();
+            }
             
             return true; 
         } finally {
@@ -1687,41 +1830,174 @@
     document.getElementById('upload-gallery').addEventListener('change', handleSharedFileUpload);
     document.getElementById('upload-camera').addEventListener('change', handleSharedFileUpload);
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getEditableCellValue(row, field) {
+        if (!row) return '-';
+        switch (field) {
+            case 'scoreValue':
+                return formatScoreValue(row.scoreValue, row.questionCount, row.trueCount);
+            case 'sectionTrueCounts':
+            case 'correctNumbers':
+            case 'wrongNumbers':
+            case 'answers':
+                return formatSectionList(row[field]);
+            case 'falseCount':
+                return String(Number(row.falseCount) || 0);
+            case 'id':
+                return String(row.id ?? '');
+            default:
+                return normalizeDisplayText(row[field]);
+        }
+    }
+
+    function renderEditableCell(row, field, className, options = {}) {
+        const attrs = [
+            'contenteditable="true"',
+            'spellcheck="false"',
+            `data-record-id="${escapeHtml(row.recordId)}"`,
+            `data-field="${field}"`
+        ];
+        if (options.uppercase) attrs.push('data-uppercase="true"');
+        if (options.numeric) attrs.push('data-numeric="true"');
+        return `<td class="${className}" ${attrs.join(' ')}>${escapeHtml(getEditableCellValue(row, field))}</td>`;
+    }
+
+    function findResultRowByRecordId(recordId) {
+        return resultData.find(row => row.recordId === recordId) || null;
+    }
+
+    function updateRowFieldFromText(row, field, rawText) {
+        if (!row) return;
+        const text = String(rawText ?? '').replace(/\u00A0/g, ' ').replace(/\s*\n+\s*/g, ' ').trim();
+        switch (field) {
+            case 'id':
+                row.id = text || row.id || String(resultData.indexOf(row) + 1);
+                break;
+            case 'name':
+            case 'kelas':
+            case 'peserta':
+                row[field] = (text || '-').toUpperCase();
+                break;
+            case 'sectionTrueCounts':
+            case 'correctNumbers':
+            case 'wrongNumbers':
+            case 'answers':
+                row[field] = text ? text.toUpperCase() : '-';
+                break;
+            case 'falseCount':
+                row.falseCount = Math.max(0, parseInt(text.replace(/[^\d-]/g, ''), 10) || 0);
+                break;
+            case 'scoreValue':
+                row.scoreValue = formatScoreValue(text, row.questionCount, row.trueCount);
+                break;
+            default:
+                row[field] = text || '-';
+                break;
+        }
+    }
+
+    function resolveEditableCell(target) {
+        if (!target) return null;
+        if (typeof target.closest === 'function') return target.closest('[data-field]');
+        if (target.parentElement && typeof target.parentElement.closest === 'function') return target.parentElement.closest('[data-field]');
+        return null;
+    }
+
+    function commitEditableCell(cell, finalize = false) {
+        if (!cell) return;
+        const row = findResultRowByRecordId(cell.dataset.recordId);
+        if (!row) return;
+        updateRowFieldFromText(row, cell.dataset.field, cell.innerText);
+        persistResults();
+        if (finalize) cell.textContent = getEditableCellValue(row, cell.dataset.field);
+    }
+
     function updateTable() {
         let tbody = document.getElementById('result-table-body'); tbody.innerHTML = '';
         resultData.forEach(d => {
-            let tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 border-b border-slate-100 text-sm transition-colors";
+            let tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 border-b border-slate-100 text-xs transition-colors";
             tr.innerHTML = `
-                <td class="p-4 text-center">
-                    <button class="btn-delete text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition" data-id="${d.id}">
+                <td class="p-3 text-center whitespace-nowrap">
+                    <button class="btn-delete text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition" data-record-id="${escapeHtml(d.recordId)}">
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </td>
-                <td class="p-4">${d.id}</td>
-                <td class="p-4 font-bold text-slate-800 uppercase">${d.name}</td>
-                <td class="p-4">${d.kelas}</td>
-                <td class="p-4">${d.peserta}</td>
-                <td class="p-4 text-emerald-600 font-bold">${d.trueCount}</td>
-                <td class="p-4 text-red-600 font-bold">${d.falseCount}</td>
-                <td class="p-4 text-slate-600 font-bold">${d.emptyCount}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[170px]">${formatSectionList(d.correctNumbers)}</td>
-                <td class="p-4 text-slate-600 whitespace-normal break-words max-w-[170px]">${formatSectionList(d.wrongNumbers)}</td>
-                <td class="p-4 text-slate-800 font-mono text-xs tracking-widest">${formatSectionList(d.answers)}</td>
-            `; tbody.appendChild(tr);
+                ${renderEditableCell(d, 'id', 'p-3 font-semibold text-slate-600 whitespace-nowrap', { numeric: true })}
+                ${renderEditableCell(d, 'name', 'p-3 font-bold text-slate-800 uppercase whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'kelas', 'p-3 whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'peserta', 'p-3 whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'sectionTrueCounts', 'p-3 text-emerald-600 font-semibold whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'falseCount', 'p-3 text-red-600 font-semibold whitespace-nowrap', { numeric: true })}
+                ${renderEditableCell(d, 'scoreValue', 'p-3 text-sky-600 font-semibold whitespace-nowrap', { numeric: true })}
+                ${renderEditableCell(d, 'correctNumbers', 'p-3 text-slate-600 whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'wrongNumbers', 'p-3 text-slate-600 whitespace-nowrap', { uppercase: true })}
+                ${renderEditableCell(d, 'answers', 'p-3 text-slate-800 font-mono whitespace-nowrap tracking-wide', { uppercase: true })}
+            `;
+            tbody.appendChild(tr);
         });
         persistResults();
+        syncResultToolbar();
+    }
+
+    function syncResultToolbar() {
+        const hasResults = resultData.length > 0;
+        ['btn-export', 'btn-clear-results'].forEach(id => {
+            const button = document.getElementById(id);
+            if (!button) return;
+            button.disabled = !hasResults;
+            button.classList.toggle('opacity-50', !hasResults);
+            button.classList.toggle('cursor-not-allowed', !hasResults);
+        });
     }
 
     resultData = loadStoredResults();
     scanCounter = resultData.reduce((maxId, row) => Math.max(maxId, Number(row.id) || 0), 0) + 1;
     updateTable();
 
+    document.getElementById('btn-clear-results').addEventListener('click', () => {
+        if (!resultData.length) return showCustomAlert("Tabel rekap masih kosong.");
+        showDeleteAllConfirm();
+    });
+
     document.getElementById('result-table-body').addEventListener('click', e => {
-        let btn = e.target.closest('.btn-delete'); if (btn) showDeleteConfirm(parseInt(btn.getAttribute('data-id'))); 
+        let btn = e.target.closest('.btn-delete'); if (btn) showDeleteConfirm(btn.getAttribute('data-record-id')); 
+    });
+
+    document.getElementById('result-table-body').addEventListener('input', e => {
+        const cell = resolveEditableCell(e.target);
+        if (cell) commitEditableCell(cell, false);
+    });
+
+    document.getElementById('result-table-body').addEventListener('blur', e => {
+        const cell = resolveEditableCell(e.target);
+        if (cell) commitEditableCell(cell, true);
+    }, true);
+
+    document.getElementById('result-table-body').addEventListener('keydown', e => {
+        const cell = resolveEditableCell(e.target);
+        if (cell && e.key === 'Enter') {
+            e.preventDefault();
+            cell.blur();
+        }
     });
 
     document.getElementById('btn-confirm-delete').addEventListener('click', () => {
-        if (pendingDeleteId !== null) { resultData = resultData.filter(d => d.id !== pendingDeleteId); updateTable(); closeModal('confirm-modal'); }
+        if (pendingDeleteAll) {
+            resultData = [];
+            scanCounter = 1;
+            updateTable();
+            closeModal('confirm-modal');
+            return;
+        }
+        if (pendingDeleteId !== null) { resultData = resultData.filter(d => d.recordId !== pendingDeleteId); updateTable(); closeModal('confirm-modal'); }
     });
 
     function showPopupResult(data, isDuplicate = false, index = -1) {
@@ -1762,7 +2038,8 @@
             let btnUpdate = document.createElement('button'); btnUpdate.className = "px-5 py-2.5 bg-yellow-500 font-bold text-white rounded-lg hover:bg-yellow-600 transition flex-1"; btnUpdate.innerText = "Perbarui Data";
             btnUpdate.onclick = () => { 
                 if (pendingUpdateIndex !== -1 && pendingUpdateData) { 
-                    let updated = getUpdatedData();
+                    let updated = normalizeStoredResultRow(getUpdatedData(), pendingUpdateIndex);
+                    updated.recordId = resultData[pendingUpdateIndex].recordId;
                     updated.id = resultData[pendingUpdateIndex].id;
                     resultData[pendingUpdateIndex] = updated; 
                     updateTable(); 
@@ -1778,8 +2055,8 @@
             
             let btnClose = document.createElement('button'); btnClose.className = "px-6 py-3 bg-emerald-600 font-bold text-white rounded-lg hover:bg-emerald-700 flex-1 text-center transition shadow-md"; btnClose.innerText = "Simpan dan Lanjutkan"; 
             btnClose.onclick = () => { 
-                let updated = getUpdatedData();
-                let idx = resultData.findIndex(d => d.id === updated.id);
+                let updated = normalizeStoredResultRow(getUpdatedData());
+                let idx = resultData.findIndex(d => d.recordId === updated.recordId);
                 if (idx !== -1) resultData[idx] = updated; 
                 updateTable();
                 closeModal('result-modal'); 
@@ -1793,7 +2070,18 @@
 
     document.getElementById('btn-export').addEventListener('click', () => {
         if (!resultData.length) return showCustomAlert("Belum ada hasil pemindaian untuk diekspor.");
-        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({ "No": d.id, "Nama": d.name, "Kelas": d.kelas, "Benar": d.trueCount, "Salah": d.falseCount, "Kosong": d.emptyCount, "Detail Benar": formatSectionList(d.correctNumbers), "Detail Salah": formatSectionList(d.wrongNumbers), "Jawaban": formatSectionList(d.answers) })));
+        const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({
+            "No": d.id,
+            "Nama": d.name,
+            "Kelas": d.kelas,
+            "Nomor Peserta": d.peserta,
+            "Benar": formatSectionList(d.sectionTrueCounts),
+            "Salah": d.falseCount,
+            "Nilai": formatScoreValue(d.scoreValue, d.questionCount, d.trueCount),
+            "Nomor Benar": formatSectionList(d.correctNumbers),
+            "Nomor Salah": formatSectionList(d.wrongNumbers),
+            "Jawaban": formatSectionList(d.answers)
+        })));
         const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Rekap LJK");
         XLSX.writeFile(wb, `Rekap_LJK_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
