@@ -312,6 +312,7 @@
     let bubbleConfig = { ...DEFAULT_BUBBLE_CONFIG };
     let activeLayoutConfig = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
     let answerKeyState = {};
+    let currentScanSource = 'upload';
 
     function deepCopy(value) {
         return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -883,6 +884,62 @@
         return selected;
     }
 
+    function shared_evaluateExclusiveChoice(opts, ctx, keyToken = null) {
+        const metrics = shared_buildMetrics(opts);
+        const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
+        const best = ranked[0];
+        const second = ranked[1];
+        const isCameraScan = currentScanSource === 'camera';
+        const strictMarked = metrics.filter(opt =>
+            opt.signalRatio >= (getBubbleSignalRatio() * (isCameraScan ? 1.18 : 1.04))
+            && opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * (isCameraScan ? 1.22 : 1.12))
+            && (
+                opt.centerFillRatio >= (getBubbleCenterFillRatio() * (isCameraScan ? 1.04 : 0.94))
+                || opt.fillRatio >= (getBubbleMarkedFillRatio() * (isCameraScan ? 1.14 : 1.1))
+            )
+        );
+
+        const dominanceGap = Math.max(getBubbleSoftGapRatio() * (isCameraScan ? 2.6 : 1.85), isCameraScan ? 0.045 : 0.03);
+        const signalGap = isCameraScan ? 0.28 : 0.2;
+        const bestDominant = !!(best && second
+            && (best.combinedFillRatio - second.combinedFillRatio) >= dominanceGap
+            && (best.signalRatio - second.signalRatio) >= signalGap);
+        const bestStrongEnough = !!(best
+            && best.signalRatio >= (getBubbleSignalRatio() * (isCameraScan ? 1.02 : 0.95))
+            && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * (isCameraScan ? 1.08 : 1.02))
+            && (
+                best.centerFillRatio >= (getBubbleCenterFillRatio() * (isCameraScan ? 0.96 : 0.86))
+                || best.fillRatio >= (getBubbleMarkedFillRatio() * (isCameraScan ? 1.1 : 1.05))
+            ));
+
+        let selected = '-';
+        let drawOptions = [];
+
+        if (strictMarked.length === 1) {
+            if (!isCameraScan || bestStrongEnough) {
+                selected = strictMarked[0].v;
+                drawOptions = [strictMarked[0]];
+            }
+        } else if (strictMarked.length > 1) {
+            if (bestStrongEnough && bestDominant) {
+                selected = best.v;
+                drawOptions = [best];
+            } else {
+                selected = '*';
+            }
+        } else if (bestStrongEnough && bestDominant) {
+            selected = best.v;
+            drawOptions = [best];
+        }
+
+        if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
+        if (drawOptions.length) {
+            const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
+            drawOptions.forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
+        }
+        return selected;
+    }
+
     function shared_evaluateMultiChoice(opts, ctx, keyToken = '') {
         const metrics = shared_buildMetrics(opts);
         const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
@@ -987,11 +1044,15 @@
                     : String(sectionKeys[index] || '').toUpperCase().trim();
                 if (!keyToken) return;
                 questionCount++;
-                const detected = section.mode === 'multi'
-                    ? shared_evaluateMultiChoice(opts, ctx, keyToken)
-                    : shared_evaluateSingleChoice(opts, ctx, keyToken);
+                let detected = '-';
+                if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken);
+                else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken);
+                else detected = shared_evaluateSingleChoice(opts, ctx, keyToken);
                 sectionAnswers.push(`${question.number}-${detected}`);
-                if (detected === '-' || detected === '*') {
+                if (section.mode === 'single_token' && detected === '*') {
+                    falseCount++;
+                    sectionWrong.push(question.number);
+                } else if (detected === '-' || detected === '*') {
                     emptyCount++;
                 } else if (detected === keyToken) {
                     trueCount++;
@@ -1207,6 +1268,7 @@
     }
 
     function cam_performExtraction(warpedMat) {
+        currentScanSource = 'camera';
         let ctx = resultCanvas.getContext('2d');
         let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
@@ -1664,6 +1726,7 @@
     }
 
     function up_performExtraction(warpedMat) {
+        currentScanSource = 'upload';
         let ctx = resultCanvas.getContext('2d');
         let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
