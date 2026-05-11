@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -44,7 +45,6 @@
                 > Kamera: panduan ROI dan pelacakan dinamis aktif.<br>
                 > Kamera: pengunci ketajaman dan smoothing adaptif aktif.<br>
             </div>
-            <p id="paper-config-badge" class="mt-3 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700">Format aktif: F4 Portrait | Grid 38x61 | Fiducial 40</p>
             <div>
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-1 text-slate-700 uppercase">Panel Kunci Jawaban</label>
                 <p id="answer-key-summary" class="mb-3 text-[11px] font-medium leading-relaxed text-slate-500">Belum ada blok soal aktif pada desain.</p>
@@ -106,13 +106,12 @@
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-600">
                         <th class="p-4 font-bold text-center">Aksi</th>
-                        <th class="p-4 font-bold">Nomor</th>
-                        <th class="p-4 font-bold text-slate-900">Nama Peserta</th>
-                        <th class="p-4 font-bold">Kelas</th>
-                        <th class="p-4 font-bold">Nomor Peserta</th>
+                        <th class="p-4 font-bold cursor-pointer select-none" data-sort="peserta"><button type="button" class="sort-btn flex items-center gap-2 font-bold">Nomor Peserta <span class="text-[10px] text-slate-400" data-sort-icon="peserta"></span></button></th>
+                        <th class="p-4 font-bold text-slate-900 cursor-pointer select-none" data-sort="name"><button type="button" class="sort-btn flex items-center gap-2 font-bold">Nama Peserta <span class="text-[10px] text-slate-400" data-sort-icon="name"></span></button></th>
+                        <th class="p-4 font-bold cursor-pointer select-none" data-sort="kelas"><button type="button" class="sort-btn flex items-center gap-2 font-bold">Kelas <span class="text-[10px] text-slate-400" data-sort-icon="kelas"></span></button></th>
                         <th class="p-4 font-bold text-emerald-500">Benar</th>
                         <th class="p-4 font-bold text-red-500">Salah</th>
-                        <th class="p-4 font-bold text-sky-500">Nilai</th>
+                        <th class="p-4 font-bold text-sky-500 cursor-pointer select-none" data-sort="scoreValue"><button type="button" class="sort-btn flex items-center gap-2 font-bold">Nilai <span class="text-[10px] text-slate-400" data-sort-icon="scoreValue"></span></button></th>
                         <th class="p-4 font-bold text-emerald-600">Nomor Benar</th>
                         <th class="p-4 font-bold text-red-600">Nomor Salah</th>
                         <th class="p-4 font-bold text-slate-700">Jawaban Terdeteksi</th>
@@ -161,8 +160,8 @@
             </label>
             <label class="w-full px-4 py-3.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold shadow-sm hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-3">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                Pilih dari Perangkat
-                <input type="file" id="upload-gallery" accept="image/*" class="hidden">
+                Pilih Gambar / PDF
+                <input type="file" id="upload-gallery" accept="image/*,application/pdf,.pdf" class="hidden">
             </label>
         </div>
         <button onclick="closeModal('upload-choice-modal')" class="mt-6 text-sm text-slate-400 hover:text-slate-600 font-bold transition">Tutup</button>
@@ -277,7 +276,7 @@
       { startSoal: 21, c: 32, rows: 3, options: 4, layout: 'H', labels: ['A','B','C','D'] }
   ]},
   jawaban_bs: { visible: true, title: 'III. PG Benar-Salah', startRow: 26, blocks: [
-      { startSoal: 24, c: 32, rows: 2, options: 2, layout: 'H', labels: ['B','S'] }
+      { startSoal: 24, c: 32, rows: 2, options: 6, layout: 'H', labels: ['B','S','B','S','B','S'] }
   ]},
   jawaban_menjodohkan: { visible: true, title: 'IV. MENJODOHKAN', startRow: 33, blocks: [
       { startSoal: 26, c: 3, rows: 5, options: 10, layout: 'H', labels: ['A','B','C','D','E','F','G','H','I','J'] },
@@ -305,7 +304,7 @@
     const SECTION_META = {
         jawaban_pg: { id: 'jawaban_pg', label: 'Pilihan Ganda', short: 'PG', mode: 'single', placeholder: 'Contoh: ABCDABCD atau A,B,C,D', help: 'Isi 1 huruf per nomor. Huruf yang diterima: A-D.' },
         jawaban_pgk: { id: 'jawaban_pgk', label: 'Pilihan Ganda Kompleks', short: 'PGK', mode: 'multi', placeholder: 'Contoh: AB, AC, BD, CD', help: 'Pisahkan tiap nomor dengan koma. Tiap nomor dapat berisi lebih dari satu jawaban benar, misalnya AB.' },
-        jawaban_bs: { id: 'jawaban_bs', label: 'Benar / Salah', short: 'BS', mode: 'single', placeholder: 'Contoh: BSBSB atau B,S,B,S,B', help: 'Isi 1 huruf per nomor. Huruf yang diterima: B atau S.' },
+        jawaban_bs: { id: 'jawaban_bs', label: 'Benar / Salah', short: 'BS', mode: 'binary_groups', placeholder: 'Contoh: BBB, BBS, BSS, SSS', help: 'Isi 1 token per nomor. Setiap token berisi rangkaian B/S sesuai jumlah pernyataan pada desain, misalnya BBB atau BBS.' },
         jawaban_menjodohkan: { id: 'jawaban_menjodohkan', label: 'Menjodohkan', short: 'MJ', mode: 'single_token', placeholder: 'Contoh: A,C,E,B,J', help: 'Pisahkan tiap nomor dengan koma. Nilai mengikuti label opsi yang tampil pada desain.' }
     };
     let paperConfig = { ...DEFAULT_PAPER_CONFIG };
@@ -456,11 +455,6 @@
 
     function applyPaperConfig(cfg = {}) {
         paperConfig = normalizePaperConfig(cfg);
-        const badge = document.getElementById('paper-config-badge');
-        if (badge) {
-            const orientationLabel = paperConfig.orientation === 'L' ? 'Landscape' : 'Portrait';
-            badge.textContent = `Format aktif: ${paperConfig.presetPaper} ${orientationLabel} | Grid ${paperConfig.gridCols}x${paperConfig.gridRows} | Fiducial ${paperConfig.fiducialMiddleRow} | Bubble ${Math.round(bubbleConfig.diameterRatio * 100)}%`;
-        }
         return { ...paperConfig };
     }
 
@@ -495,6 +489,8 @@
     let resultData = [], scanCounter = 1, videoScanLoop = null;
     let isProcessing = false; 
     let pendingUpdateData = null, pendingUpdateIndex = -1, pendingDeleteId = null, pendingDeleteAll = false;
+    let batchImportActive = false;
+    let tableSort = { field: 'peserta', dir: 'asc' };
 
     let camStableFrames = 0;
     let camLostFrames = 0;
@@ -531,7 +527,7 @@
     }
 
     function defaultSectionLabels(sectionId, optionCount) {
-        if (sectionId === 'jawaban_bs') return ['B', 'S'];
+        if (sectionId === 'jawaban_bs') return Array.from({ length: Math.max(2, optionCount) }, (_, i) => (i % 2 === 0 ? 'B' : 'S'));
         if (sectionId === 'jawaban_menjodohkan') return Array.from({ length: optionCount }, (_, i) => String.fromCharCode(65 + i));
         return Array.from({ length: optionCount }, (_, i) => String.fromCharCode(65 + i));
     }
@@ -623,12 +619,39 @@
         return orderValues.filter(val => uniq.has(String(val).toUpperCase())).join('');
     }
 
+    function getBinaryGroupCount(question) {
+        const optionCount = Array.isArray(question?.options) ? question.options.length : 0;
+        return Math.max(1, Math.floor(optionCount / 2));
+    }
+
+    function normalizeBinaryGroupToken(token, groupCount) {
+        const normalized = String(token || '').toUpperCase().replace(/[^BS]/g, '');
+        if (!groupCount) return '';
+        return normalized.length >= groupCount ? normalized.slice(0, groupCount) : '';
+    }
+
     function parseAnswerKeyValue(sectionId, rawValue, questions) {
         const clean = String(rawValue || '').toUpperCase().trim();
         if (!clean) return [];
-        if (sectionId === 'jawaban_pg' || sectionId === 'jawaban_bs') {
-            const allowed = sectionId === 'jawaban_bs' ? /[BS]/g : /[A-D]/g;
-            return clean.match(allowed) || [];
+        if (sectionId === 'jawaban_pg') {
+            return clean.match(/[A-D]/g) || [];
+        }
+        if (sectionId === 'jawaban_bs') {
+            const groupCount = getBinaryGroupCount(questions[0]);
+            if (groupCount <= 1) return clean.match(/[BS]/g) || [];
+            const hasDelimiters = /[\n,;|\/]+/.test(clean);
+            if (hasDelimiters) {
+                return clean
+                    .split(/[\n,;|\/]+/)
+                    .map(token => normalizeBinaryGroupToken(token, groupCount))
+                    .filter(token => token.length === groupCount);
+            }
+            const compact = clean.replace(/[^BS]/g, '');
+            const tokens = [];
+            for (let i = 0; i + groupCount <= compact.length; i += groupCount) {
+                tokens.push(compact.slice(i, i + groupCount));
+            }
+            return tokens;
         }
         if (sectionId === 'jawaban_pgk') {
             const order = questions[0] ? questions[0].options.map(opt => String(opt.v).toUpperCase()) : ['A', 'B', 'C', 'D'];
@@ -702,6 +725,9 @@
     }
 
     const checkCV = setInterval(() => { if (typeof cv !== 'undefined' && cv.Mat) { clearInterval(checkCV); document.getElementById('cv-status').innerHTML = '<div class="w-3 h-3 rounded-full bg-emerald-500"></div> Engine OpenCV Siap'; } }, 500);
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
 
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
@@ -753,6 +779,10 @@
             row.sectionTrueCounts || row.trueCountBySection || deriveSectionCountSummary(row.correctNumbers) || (questionCount ? `TOTAL: ${trueCount}` : ''),
             '-'
         );
+        const sectionFalseCounts = normalizeDisplayText(
+            row.sectionFalseCounts || row.falseCountBySection || deriveSectionCountSummary(row.wrongNumbers) || (questionCount ? `TOTAL: ${falseCount}` : ''),
+            '-'
+        );
         return {
             recordId: String(row.recordId || createRecordId()),
             id: String(row.id ?? (index + 1)).trim() || String(index + 1),
@@ -765,6 +795,7 @@
             questionCount,
             scoreValue: formatScoreValue(row.scoreValue, questionCount, trueCount),
             sectionTrueCounts,
+            sectionFalseCounts,
             answers: normalizeDisplayText(row.answers),
             correctNumbers: normalizeDisplayText(row.correctNumbers),
             wrongNumbers: normalizeDisplayText(row.wrongNumbers)
@@ -977,6 +1008,16 @@
         return selected;
     }
 
+    function shared_evaluateBinaryGroups(opts, ctx, keyToken = '') {
+        const pairs = [];
+        for (let i = 0; i + 1 < opts.length; i += 2) {
+            pairs.push(opts.slice(i, i + 2));
+        }
+        if (!pairs.length) return '-';
+        const detectedParts = pairs.map((pair, index) => shared_evaluateExclusiveChoice(pair, ctx, String(keyToken || '').charAt(index) || null));
+        return detectedParts.join('');
+    }
+
     function shared_extractIdentity(grid, cfg, vals, ctx) {
         if (!cfg || cfg.visible === false) return '-';
         const labels = Array.isArray(cfg.labels) && cfg.labels.length ? cfg.labels.map(v => String(v).toUpperCase()) : vals.map(v => String(v).toUpperCase());
@@ -1017,6 +1058,7 @@
         const correctNumbers = [];
         const wrongNumbers = [];
         const sectionTrueCounts = [];
+        const sectionFalseCounts = [];
         let trueCount = 0, falseCount = 0, emptyCount = 0, questionCount = 0;
 
         getVisibleAnswerSections().forEach(section => {
@@ -1025,6 +1067,7 @@
             const sectionCorrect = [];
             const sectionWrong = [];
             let sectionTrueCount = 0;
+            let sectionFalseCount = 0;
             section.questions.forEach((question, index) => {
                 if (index >= sectionKeys.length) return;
                 const opts = question.options.map(option => {
@@ -1046,11 +1089,26 @@
                 questionCount++;
                 let detected = '-';
                 if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken);
+                else if (section.mode === 'binary_groups') detected = shared_evaluateBinaryGroups(opts, ctx, keyToken);
                 else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken);
                 else detected = shared_evaluateSingleChoice(opts, ctx, keyToken);
                 sectionAnswers.push(`${question.number}-${detected}`);
-                if (section.mode === 'single_token' && detected === '*') {
+                if (section.mode === 'binary_groups') {
+                    const emptyToken = '-'.repeat(Math.max(1, keyToken.length));
+                    if (detected === emptyToken) {
+                        emptyCount++;
+                    } else if (detected === keyToken) {
+                        trueCount++;
+                        sectionTrueCount++;
+                        sectionCorrect.push(question.number);
+                    } else {
+                        falseCount++;
+                        sectionFalseCount++;
+                        sectionWrong.push(question.number);
+                    }
+                } else if (section.mode === 'single_token' && detected === '*') {
                     falseCount++;
+                    sectionFalseCount++;
                     sectionWrong.push(question.number);
                 } else if (detected === '-' || detected === '*') {
                     emptyCount++;
@@ -1060,11 +1118,13 @@
                     sectionCorrect.push(question.number);
                 } else {
                     falseCount++;
+                    sectionFalseCount++;
                     sectionWrong.push(question.number);
                 }
             });
             if (sectionAnswers.length) answers.push(`${section.short}: ${sectionAnswers.join(', ')}`);
             if (sectionKeys.length) sectionTrueCounts.push(`${section.short}: ${sectionTrueCount}`);
+            if (sectionKeys.length) sectionFalseCounts.push(`${section.short}: ${sectionFalseCount}`);
             if (sectionCorrect.length) correctNumbers.push(`${section.short}: ${sectionCorrect.join(', ')}`);
             if (sectionWrong.length) wrongNumbers.push(`${section.short}: ${sectionWrong.join(', ')}`);
         });
@@ -1076,6 +1136,7 @@
             questionCount,
             scoreValue: questionCount > 0 ? ((trueCount / questionCount) * 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') : '0',
             sectionTrueCounts,
+            sectionFalseCounts,
             answers,
             correctNumbers,
             wrongNumbers
@@ -1325,14 +1386,18 @@
             if (existingIndex !== -1) {
                 dataRow.recordId = resultData[existingIndex].recordId;
                 dataRow.id = resultData[existingIndex].id;
-                showPopupResult(dataRow, true, existingIndex);
+                if (batchImportActive) {
+                    resultData[existingIndex] = dataRow;
+                } else {
+                    showPopupResult(dataRow, true, existingIndex);
+                }
             } else {
                 dataRow.recordId = createRecordId();
                 dataRow.id = String(scanCounter++);
                 resultData.push(dataRow);
-                showPopupResult(dataRow, false);
-                updateTable();
+                if (!batchImportActive) showPopupResult(dataRow, false);
             }
+            updateTable();
             
             return true; 
         } finally {
@@ -1783,14 +1848,18 @@
             if (existingIndex !== -1) {
                 dataRow.recordId = resultData[existingIndex].recordId;
                 dataRow.id = resultData[existingIndex].id;
-                showPopupResult(dataRow, true, existingIndex);
+                if (batchImportActive) {
+                    resultData[existingIndex] = dataRow;
+                } else {
+                    showPopupResult(dataRow, true, existingIndex);
+                }
             } else {
                 dataRow.recordId = createRecordId();
                 dataRow.id = String(scanCounter++);
                 resultData.push(dataRow);
-                showPopupResult(dataRow, false);
-                updateTable();
+                if (!batchImportActive) showPopupResult(dataRow, false);
             }
+            updateTable();
             
             return true; 
         } finally {
@@ -1798,15 +1867,18 @@
         }
     }
 
-    function runUploadPipeline(canvas) {
+    function runUploadPipeline(canvas, options = {}) {
         let src = null, roughWarped = null, finalWarpedMat = null; 
+        const batchMode = !!options.batchMode;
+        let completed = false;
         try {
             src = cv.imread(canvas);
-            logAI("[UPLOAD] Tahap 1: Multi-Strategy Contour Detection...");
+            const prefix = batchMode ? `[PDF ${options.pageIndex}/${options.totalPages}]` : "[UPLOAD]";
+            logAI(`${prefix} Tahap 1: Multi-Strategy Contour Detection...`);
             let paperPts = up_detectPaperRegion(src);
             
             if (!paperPts) {
-                logAI("[UPLOAD] Gagal deteksi kontur. Force Full Frame...");
+                logAI(`${prefix} Gagal deteksi kontur. Force Full Frame...`);
                 paperPts = [ {x:0,y:0}, {x:src.cols,y:0}, {x:src.cols,y:src.rows}, {x:0,y:src.rows} ];
             }
             
@@ -1827,15 +1899,15 @@
             cv.warpPerspective(src, roughWarped, M_rough, new cv.Size(ROUGH_W, ROUGH_H));
             srcMat.delete(); dstMat.delete(); M_rough.delete();
 
-            logAI("[UPLOAD] Tahap 2: Filter Struktural Fiducial (Min X-Variance)...");
+            logAI(`${prefix} Tahap 2: Filter Struktural Fiducial (Min X-Variance)...`);
             let fid = up_find6FiducialsWithFallback(roughWarped);
 
             let isFailedWarp = false;
             if (fid) {
-                logAI("[UPLOAD] Tahap 3: Dynamic Split-Ratio Warp...");
+                logAI(`${prefix} Tahap 3: Dynamic Split-Ratio Warp...`);
                 finalWarpedMat = up_performDualWarp(roughWarped, fid);
             } else {
-                logAI("[UPLOAD] INFO: Fiducial Gagal. Menampilkan hasil kasar (Debug Mode).", true);
+                logAI(`${prefix} INFO: Fiducial gagal ditemukan.`, true);
                 finalWarpedMat = roughWarped.clone();
                 isFailedWarp = true;
             }
@@ -1847,35 +1919,102 @@
             document.getElementById('result-canvas').classList.remove('hidden');
 
             if(isFailedWarp) {
-                showCustomAlert("Diagnostik Pemindaian:\nSistem gagal menemukan 6 titik kotak LJK secara selaras.\n\nGambar yang diluruskan secara kasar tetap ditampilkan pada layar agar Bapak dapat menganalisis letak distorsi atau bayangannya.");
-                return;
+                if (!batchMode) showCustomAlert("Diagnostik Pemindaian:\nSistem gagal menemukan 6 titik kotak LJK secara selaras.\n\nGambar yang diluruskan secara kasar tetap ditampilkan pada layar agar Bapak dapat menganalisis letak distorsi atau bayangannya.");
+                return false;
             }
 
             let isSuccess = up_performExtraction(finalWarpedMat);
             if (!isSuccess) {
-                logAI("[UPLOAD] Ekstraksi kosong. Rotasi 180 derajat otomatis...");
+                logAI(`${prefix} Ekstraksi kosong. Rotasi 180 derajat otomatis...`);
                 cv.rotate(finalWarpedMat, finalWarpedMat, cv.ROTATE_180);
                 cv.imshow('result-canvas', finalWarpedMat);
                 isSuccess = up_performExtraction(finalWarpedMat); 
                 if (!isSuccess) {
-                    showCustomAlert("Diagnostik Pemindaian:\nIsian LJK tidak dapat diekstrak atau grid tidak selaras. Gambar telah dipertahankan di layar untuk analisis Bapak.");
+                    if (!batchMode) showCustomAlert("Diagnostik Pemindaian:\nIsian LJK tidak dapat diekstrak atau grid tidak selaras. Gambar telah dipertahankan di layar untuk analisis Bapak.");
                 }
             }
+            completed = !!isSuccess;
+            return completed;
         } catch (err) {
-            logAI(err.message, true); showCustomAlert(err.message); 
+            logAI(err.message, true);
+            if (!batchMode) showCustomAlert(err.message);
+            return false;
         } finally { 
             if(src) src.delete(); 
             if(roughWarped) roughWarped.delete();
             if(finalWarpedMat) finalWarpedMat.delete(); 
+            if (!batchMode) {
+                document.getElementById('loader-overlay').classList.add('hidden');
+                isProcessing = false;
+            }
+        }
+    }
+
+    async function renderPdfPageToCanvas(page, canvas) {
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = Math.max(1, Math.min(3, 2200 / Math.max(baseViewport.width, baseViewport.height)));
+        const viewport = page.getViewport({ scale });
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+    }
+
+    async function processPdfFile(file, inputEl) {
+        if (!window.pdfjsLib) {
+            showCustomAlert("Mesin pembaca PDF belum siap. Pastikan koneksi internet aktif lalu buka ulang aplikasi.");
+            if (inputEl) inputEl.value = '';
+            return;
+        }
+        batchImportActive = true;
+        resetUI();
+        isProcessing = true;
+        closeModal('upload-choice-modal');
+        document.getElementById('loader-overlay').classList.remove('hidden');
+        let successCount = 0;
+        let failedCount = 0;
+        try {
+            const buffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+            for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex++) {
+                scanStatus.innerText = `PDF ${pageIndex}/${pdf.numPages}`;
+                document.getElementById('loader-text').innerHTML = `Memproses PDF ${pageIndex}/${pdf.numPages}<br><span class="text-[9px] text-slate-400">Halaman LJK sedang dianalisis...</span>`;
+                const page = await pdf.getPage(pageIndex);
+                await renderPdfPageToCanvas(page, hiddenCanvas);
+                const ok = runUploadPipeline(hiddenCanvas, { batchMode: true, pageIndex, totalPages: pdf.numPages });
+                if (ok) successCount++;
+                else failedCount++;
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            updateTable();
+            logAI(`[PDF] Selesai. Berhasil: ${successCount}, gagal: ${failedCount}.`, failedCount > 0);
+            showCustomAlert(`Impor PDF selesai.\n\nBerhasil dipindai: ${successCount} halaman\nGagal dipindai: ${failedCount} halaman`);
+        } catch (err) {
+            logAI(`[PDF] ${err.message}`, true);
+            showCustomAlert(`PDF tidak dapat diproses.\n\n${err.message}`);
+        } finally {
+            batchImportActive = false;
+            isProcessing = false;
             document.getElementById('loader-overlay').classList.add('hidden');
-            isProcessing = false; 
+            document.getElementById('loader-text').innerHTML = 'Menganalisis lembar LJK<br><span class="text-[9px] text-slate-400">Menjalankan pipeline pemindaian presisi...</span>';
+            scanStatus.innerText = "Pemindaian PDF selesai";
+            if (inputEl) inputEl.value = '';
         }
     }
 
     function handleSharedFileUpload(e) {
         if (!validateKey() || !e.target.files[0] || isProcessing) { e.target.value = ''; return; }
-        isProcessing = true; 
+        const file = e.target.files[0];
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+        if (isPdf) {
+            processPdfFile(file, e.target);
+            return;
+        }
+        batchImportActive = false;
         resetUI(); 
+        isProcessing = true; 
         closeModal('upload-choice-modal'); 
         
         const reader = new FileReader();
@@ -1887,7 +2026,7 @@
                 document.getElementById('loader-overlay').classList.remove('hidden');
                 setTimeout(() => runUploadPipeline(hiddenCanvas), 100); 
             }; img.src = ev.target.result;
-        }; reader.readAsDataURL(e.target.files[0]);
+        }; reader.readAsDataURL(file);
     }
 
     document.getElementById('upload-gallery').addEventListener('change', handleSharedFileUpload);
@@ -1908,6 +2047,7 @@
             case 'scoreValue':
                 return formatScoreValue(row.scoreValue, row.questionCount, row.trueCount);
             case 'sectionTrueCounts':
+            case 'sectionFalseCounts':
             case 'correctNumbers':
             case 'wrongNumbers':
             case 'answers':
@@ -1950,6 +2090,7 @@
                 row[field] = (text || '-').toUpperCase();
                 break;
             case 'sectionTrueCounts':
+            case 'sectionFalseCounts':
             case 'correctNumbers':
             case 'wrongNumbers':
             case 'answers':
@@ -1980,12 +2121,40 @@
         if (!row) return;
         updateRowFieldFromText(row, cell.dataset.field, cell.innerText);
         persistResults();
-        if (finalize) cell.textContent = getEditableCellValue(row, cell.dataset.field);
+        if (finalize) {
+            cell.textContent = getEditableCellValue(row, cell.dataset.field);
+            if (['peserta', 'name', 'kelas', 'scoreValue'].includes(cell.dataset.field)) updateTable();
+        }
+    }
+
+    function getSortValue(row, field) {
+        if (field === 'scoreValue') return Number(String(row.scoreValue ?? '').replace(',', '.')) || 0;
+        return normalizeDisplayText(row[field], '').toUpperCase();
+    }
+
+    function compareResultRows(a, b) {
+        const field = tableSort.field || 'peserta';
+        const dir = tableSort.dir === 'desc' ? -1 : 1;
+        const av = getSortValue(a, field);
+        const bv = getSortValue(b, field);
+        if (typeof av === 'number' || typeof bv === 'number') return ((Number(av) || 0) - (Number(bv) || 0)) * dir;
+        const cmp = String(av).localeCompare(String(bv), 'id-ID', { numeric: true, sensitivity: 'base' });
+        return cmp * dir;
+    }
+
+    function getSortedResultRows() {
+        return [...resultData].sort((a, b) => compareResultRows(a, b));
+    }
+
+    function updateSortHeaders() {
+        document.querySelectorAll('[data-sort-icon]').forEach(icon => {
+            icon.textContent = icon.dataset.sortIcon === tableSort.field ? (tableSort.dir === 'asc' ? '^' : 'v') : '';
+        });
     }
 
     function updateTable() {
         let tbody = document.getElementById('result-table-body'); tbody.innerHTML = '';
-        resultData.forEach(d => {
+        getSortedResultRows().forEach(d => {
             let tr = document.createElement('tr'); tr.className = "hover:bg-slate-50 border-b border-slate-100 text-xs transition-colors";
             tr.innerHTML = `
                 <td class="p-3 text-center whitespace-nowrap">
@@ -1993,12 +2162,11 @@
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </td>
-                ${renderEditableCell(d, 'id', 'p-3 font-semibold text-slate-600 whitespace-nowrap', { numeric: true })}
+                ${renderEditableCell(d, 'peserta', 'p-3 whitespace-nowrap', { uppercase: true })}
                 ${renderEditableCell(d, 'name', 'p-3 font-bold text-slate-800 uppercase whitespace-nowrap', { uppercase: true })}
                 ${renderEditableCell(d, 'kelas', 'p-3 whitespace-nowrap', { uppercase: true })}
-                ${renderEditableCell(d, 'peserta', 'p-3 whitespace-nowrap', { uppercase: true })}
                 ${renderEditableCell(d, 'sectionTrueCounts', 'p-3 text-emerald-600 font-semibold whitespace-nowrap', { uppercase: true })}
-                ${renderEditableCell(d, 'falseCount', 'p-3 text-red-600 font-semibold whitespace-nowrap', { numeric: true })}
+                ${renderEditableCell(d, 'sectionFalseCounts', 'p-3 text-red-600 font-semibold whitespace-nowrap', { uppercase: true })}
                 ${renderEditableCell(d, 'scoreValue', 'p-3 text-sky-600 font-semibold whitespace-nowrap', { numeric: true })}
                 ${renderEditableCell(d, 'correctNumbers', 'p-3 text-slate-600 whitespace-nowrap', { uppercase: true })}
                 ${renderEditableCell(d, 'wrongNumbers', 'p-3 text-slate-600 whitespace-nowrap', { uppercase: true })}
@@ -2007,6 +2175,7 @@
             tbody.appendChild(tr);
         });
         persistResults();
+        updateSortHeaders();
         syncResultToolbar();
     }
 
@@ -2050,6 +2219,19 @@
             e.preventDefault();
             cell.blur();
         }
+    });
+
+    document.querySelector('table thead').addEventListener('click', e => {
+        const sortHeader = e.target.closest('[data-sort]');
+        if (!sortHeader) return;
+        const field = sortHeader.dataset.sort;
+        if (tableSort.field === field) {
+            tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            tableSort.field = field;
+            tableSort.dir = field === 'scoreValue' ? 'desc' : 'asc';
+        }
+        updateTable();
     });
 
     document.getElementById('btn-confirm-delete').addEventListener('click', () => {
@@ -2134,12 +2316,11 @@
     document.getElementById('btn-export').addEventListener('click', () => {
         if (!resultData.length) return showCustomAlert("Belum ada hasil pemindaian untuk diekspor.");
         const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({
-            "No": d.id,
+            "Nomor Peserta": d.peserta,
             "Nama": d.name,
             "Kelas": d.kelas,
-            "Nomor Peserta": d.peserta,
             "Benar": formatSectionList(d.sectionTrueCounts),
-            "Salah": d.falseCount,
+            "Salah": formatSectionList(d.sectionFalseCounts),
             "Nilai": formatScoreValue(d.scoreValue, d.questionCount, d.trueCount),
             "Nomor Benar": formatSectionList(d.correctNumbers),
             "Nomor Salah": formatSectionList(d.wrongNumbers),
@@ -2171,7 +2352,7 @@
 </script>
 
 <script>
-window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":61,"fiducial_tengah_r":40,"fiducial_tengah_kiri_c":1,"fiducial_tengah_kanan_c":37,"preset_paper":"CUSTOM","preset_orientation":"P","paper_width_mm":215,"paper_height_mm":330,"margin_left_mm":5,"margin_top_mm":5,"margin_right_mm":5,"margin_bottom_mm":5},"pengaturan_arsiran":{"diameter_ratio":0.9,"stroke_width":0.5,"font_size":10,"font_weight":300},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":34},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN KOMPUTER (LJK)\nASESMEN SUMATIF AKHIR JENJANG","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Mata Pelajaran :","c":21,"r":4,"w":15,"h":1},{"text":"Hari / Tanggal :","c":21,"r":5,"w":15,"h":1}]},"identitas":{"nama":{"visible":true,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":21,"r":8,"w":7,"h":12,"labels":["0","1","2","3","4","5","6","7","8","9","T","."]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":34,"r":8,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":21,"blocks":[{"startSoal":1,"c":22,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":27,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":21,"blocks":[{"startSoal":21,"c":32,"rows":3,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":true,"title":"III. PG Benar-Salah","startRow":25,"blocks":[{"startSoal":24,"c":32,"rows":2,"options":2,"layout":"H","labels":["B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":32,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":32,"blocks":[{"startSoal":36,"c":25,"w":5,"rows":5,"h":1},{"startSoal":41,"c":31,"w":5,"rows":5,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":38,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":4}]}};
+window.__LJK_EMBEDDED_LAYOUT__ = {"pengaturan_kertas":{"grid_cols":38,"grid_rows":61,"fiducial_tengah_r":40,"fiducial_tengah_kiri_c":1,"fiducial_tengah_kanan_c":37,"preset_paper":"CUSTOM","preset_orientation":"P","paper_width_mm":215,"paper_height_mm":330,"margin_left_mm":5,"margin_top_mm":5,"margin_right_mm":5,"margin_bottom_mm":5},"pengaturan_arsiran":{"diameter_ratio":0.9,"stroke_width":0.5,"font_size":10,"font_weight":300},"kop_surat":{"visible":false,"src":"","c":2,"r":0,"w":18},"judul_utama":{"visible":true,"text":"LEMBAR JAWABAN KOMPUTER ASTS\nSMP NEGERI 2 SECANG\nTAHUN PELAJARAN 2025/2026","c":2,"r":0,"w":34,"h":3},"judul_secondary":{"visible":true,"blocks":[{"text":"Nama Peserta :","c":13,"r":4,"w":11,"h":1},{"text":"Mata Pelajaran :","c":13,"r":5,"w":11,"h":1},{"text":"Hari, Tanggal :","c":25,"r":4,"w":11,"h":1},{"text":"ASESMEN SUMATIF AKHIR JENJANG","c":25,"r":5,"w":11,"h":1}]},"identitas":{"nama":{"visible":false,"title":"NAMA PESERTA","layout":"V","c":2,"r":5,"w":18,"h":26},"jenis_kelamin":{"visible":false,"title":"GENDER","layout":"H","c":21,"r":5,"w":2,"h":1,"labels":["L","P"]},"no_peserta":{"visible":true,"title":"NOMOR PESERTA","layout":"V","c":2,"r":5,"w":7,"h":12,"labels":["0","1","2","3","4","5","6","7","8","9","T","."]},"kelas":{"visible":true,"title":"KELAS","layout":"V","c":10,"r":5,"w":2,"h":12,"labels":["7","8","9","A","B","C","D","E","F","G","H","T"]}},"jawaban_pg":{"visible":true,"title":"I. PILIHAN GANDA","startRow":7,"blocks":[{"startSoal":1,"c":14,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]},{"startSoal":11,"c":19,"rows":10,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_pgk":{"visible":true,"title":"II. PG KOMPLEKS","startRow":7,"blocks":[{"startSoal":21,"c":25,"rows":5,"options":4,"layout":"H","labels":["A","B","C","D"]}]},"jawaban_bs":{"visible":false,"title":"III. PGK Benar-Salah","startRow":7,"blocks":[{"startSoal":24,"c":30,"rows":2,"options":6,"layout":"H","labels":["B","S","B","S","B","S"]}]},"jawaban_menjodohkan":{"visible":true,"title":"IV. MENJODOHKAN","startRow":18,"blocks":[{"startSoal":26,"c":3,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]},{"startSoal":31,"c":14,"rows":5,"options":10,"layout":"H","labels":["A","B","C","D","E","F","G","H","I","J"]}]},"isian_singkat":{"visible":true,"title":"V. ISIAN SINGKAT","startRow":13,"blocks":[{"startSoal":36,"c":26,"w":10,"rows":10,"h":1}]},"uraian":{"visible":true,"title":"VI. URAIAN","startRow":24,"showDots":true,"blocks":[{"startSoal":46,"c":3,"w":33,"rows":5,"h":7}]}};
 window.addEventListener('load', () => {
   try {
     if (window.ScannerApp?.applyLayoutConfig) {
