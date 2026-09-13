@@ -29,8 +29,14 @@
             <h1 class="text-xl md:text-2xl font-bold tracking-tight text-emerald-300">LJK Scanner AI-TRACK</h1>
             <p class="text-xs md:text-sm text-slate-300 mt-1">Mesin pemindaian adaptif dengan pelacakan fiducial presisi</p>
         </div>
-        <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border border-slate-700">
-            <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV sedang dimuat...
+        <div class="flex items-center gap-2">
+            <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border border-slate-700">
+                <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV sedang dimuat...
+            </div>
+            <label class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-lg text-[10px] md:text-xs font-semibold border border-slate-700 cursor-pointer select-none text-slate-300" title="Rekam fillRatio, centerFillRatio, combinedFillRatio, signalRatio, dan alasan keputusan tiap bubble ke console browser untuk kalibrasi threshold (PRD bagian 10). Non-aktif secara default.">
+                <input type="checkbox" id="chk-diagnostic-mode" class="accent-emerald-500">
+                Mode Diagnostik
+            </label>
         </div>
     </header>
 
@@ -300,6 +306,29 @@
         orientation: 'P'
     };
     const DEFAULT_BUBBLE_CONFIG = { diameterRatio: 0.72, strokeWidth: 1.1, fontSize: 9.5, fontWeight: 500 };
+
+    // === PRD "Perbaikan Akurasi Deteksi Arsiran LJK" v1.0 (13 Sep 2026) — Blok Konfigurasi Threshold Terpusat (FR-05) ===
+    // Seluruh angka dasar klasifikasi arsiran dikumpulkan di satu tempat agar mudah dikalibrasi ulang
+    // dengan dataset LJK nyata (lihat PRD bagian 9.2 & 11). Nilai di bawah adalah "Baseline awal" PRD,
+    // BUKAN angka final — silakan sesuaikan berdasarkan hasil kalibrasi (bagian 14, tahap T5).
+    const BUBBLE_THRESHOLD_BASE = {
+        markedFillRatio: 0.18,      // dari 0.14 -> 0.18 (PRD 9.2)
+        signalRatio: 2.80,          // dari 2.45 -> 2.80 (PRD 9.2)
+        centerFillRatio: 0.21,      // dari 0.17 -> 0.21 (PRD 9.2)
+        combinedFillRatio: 0.18,    // dari 0.145 -> 0.18 (PRD 9.2)
+        softGapRatio: 0.035,        // dari 0.022 -> 0.035 (PRD 9.2)
+        centerWeight: 0.70,         // dari 0.64 -> 0.70 (PRD 9.1 / FR-02)
+        outerWeight: 0.30           // dari 0.36 -> 0.30 (PRD 9.1 / FR-02)
+    };
+    // Kode alasan keputusan classifier (FR-07). Dipakai pada metrik diagnostik per bubble.
+    const REASON = {
+        NO_AREA: 'NO_AREA',
+        SIGNAL_LOW: 'SIGNAL_LOW',
+        CENTER_LOW: 'CENTER_LOW',
+        COMBINED_LOW: 'COMBINED_LOW',
+        MARKED: 'MARKED',
+        REVIEW: 'REVIEW'
+    };
     const KEY_STORAGE_KEY = 'ljk-suite-answer-keys-v2';
     const SECTION_META = {
         jawaban_pg: { id: 'jawaban_pg', label: 'Pilihan Ganda', short: 'PG', mode: 'single', placeholder: 'Contoh: ABCDABCD atau A,B,C,D', help: 'Isi 1 huruf per nomor. Huruf yang diterima: A-D.' },
@@ -312,6 +341,43 @@
     let activeLayoutConfig = JSON.parse(JSON.stringify(DEFAULT_LAYOUT_CONFIG));
     let answerKeyState = {};
     let currentScanSource = 'upload';
+    // Mode diagnostik (PRD bagian 10 & Ruang Lingkup): non-aktif secara default (parameter produksi terkunci).
+    // Saat aktif, setiap keputusan bubble direkam ke lastDiagnostics untuk kalibrasi threshold berbasis data nyata.
+    let diagnosticModeEnabled = false;
+    let lastDiagnostics = [];
+
+    function resetDiagnostics() { lastDiagnostics = []; }
+
+    function recordDiagnostics(metrics, contextLabel = '') {
+        if (!diagnosticModeEnabled || !Array.isArray(metrics) || !metrics.length) return;
+        metrics.forEach(opt => {
+            lastDiagnostics.push({
+                context: contextLabel,
+                option: opt.v,
+                fillRatio: Number((opt.fillRatio || 0).toFixed(4)),
+                centerFillRatio: Number((opt.centerFillRatio || 0).toFixed(4)),
+                combinedFillRatio: Number((opt.combinedFillRatio || 0).toFixed(4)),
+                signalRatio: Number((opt.signalRatio || 0).toFixed(3)),
+                marked: !!opt.marked,
+                reason: opt.reason || (opt.marked ? REASON.MARKED : REASON.REVIEW),
+                source: currentScanSource
+            });
+        });
+    }
+
+    function summarizeDiagnostics() {
+        const summary = {};
+        lastDiagnostics.forEach(row => { summary[row.reason] = (summary[row.reason] || 0) + 1; });
+        return summary;
+    }
+
+    function logDiagnosticsSummary(prefix) {
+        if (!diagnosticModeEnabled) return;
+        const summary = summarizeDiagnostics();
+        const parts = Object.keys(summary).map(key => `${key}=${summary[key]}`).join(', ');
+        logAI(`${prefix} [DIAGNOSTIK] Sumber: ${currentScanSource}. Total bubble dievaluasi: ${lastDiagnostics.length}. ${parts || 'Tidak ada data.'} (detail lengkap: console browser / window.ScannerApp.getLastDiagnostics()).`);
+        try { console.table(lastDiagnostics); } catch (err) { console.log(lastDiagnostics); }
+    }
 
     function deepCopy(value) {
         return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -397,37 +463,42 @@
         );
     }
     function getBubbleMarkedFillRatio() {
+        const base = BUBBLE_THRESHOLD_BASE.markedFillRatio;
         return clampFloatValue(
-            0.14 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003 + (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
-            0.14,
-            0.13,
-            0.2
+            base + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003 + (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
+            base,
+            0.16,
+            0.26
         );
     }
     function getBubbleSignalRatio() {
-        return clampFloatValue(2.45 + (bubbleConfig.fontWeight >= 600 ? 0.06 : 0), 2.45, 2.25, 3.1);
+        const base = BUBBLE_THRESHOLD_BASE.signalRatio;
+        return clampFloatValue(base + (bubbleConfig.fontWeight >= 600 ? 0.06 : 0), base, 2.60, 3.45);
     }
     function getBubbleCenterSamplingScale() {
         return clampFloatValue(getBubbleSamplingScale() * 0.64, 0.28, 0.24, 0.38);
     }
     function getBubbleCenterFillRatio() {
+        const base = BUBBLE_THRESHOLD_BASE.centerFillRatio;
         return clampFloatValue(
-            0.17 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.05 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
-            0.17,
-            0.14,
-            0.25
+            base + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.05 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+            base,
+            0.18,
+            0.29
         );
     }
     function getBubbleCombinedFillRatio() {
+        const base = BUBBLE_THRESHOLD_BASE.combinedFillRatio;
         return clampFloatValue(
-            0.145 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
-            0.145,
-            0.13,
-            0.22
+            base + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+            base,
+            0.165,
+            0.26
         );
     }
     function getBubbleSoftGapRatio() {
-        return clampFloatValue(0.022 + (bubbleConfig.fontWeight >= 600 ? 0.004 : 0), 0.022, 0.018, 0.05);
+        const base = BUBBLE_THRESHOLD_BASE.softGapRatio;
+        return clampFloatValue(base + (bubbleConfig.fontWeight >= 600 ? 0.004 : 0), base, 0.031, 0.063);
     }
     function interpolateQuadPoint(quad, u, v) {
         const top = { x: quad.TL.x + ((quad.TR.x - quad.TL.x) * u), y: quad.TL.y + ((quad.TR.y - quad.TL.y) * u) };
@@ -729,6 +800,16 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
+    const diagnosticModeCheckbox = document.getElementById('chk-diagnostic-mode');
+    if (diagnosticModeCheckbox) {
+        diagnosticModeCheckbox.checked = diagnosticModeEnabled;
+        diagnosticModeCheckbox.addEventListener('change', (e) => {
+            diagnosticModeEnabled = !!e.target.checked;
+            logAI(`Mode diagnostik ${diagnosticModeEnabled ? 'DIAKTIFKAN' : 'DINONAKTIFKAN'}. ${diagnosticModeEnabled ? 'Detail per bubble akan dicatat ke console browser (F12) setiap kali pemindaian selesai.' : ''}`);
+            if (!diagnosticModeEnabled) resetDiagnostics();
+        });
+    }
+
     function shared_dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
     function createRecordId() {
@@ -836,7 +917,12 @@
         return { density: 0, area: 1, centerDensity: 0, centerArea: 1, cx: START_X + (col * GRID_SIZE) + (GRID_SIZE / 2), cy: START_Y + (row * GRID_SIZE) + (GRID_SIZE / 2) };
     }
 
-    function shared_buildMetrics(opts) {
+    // shared_buildMetrics() — titik klasifikasi utama arsiran (PRD bagian 7 & 9.3).
+    // PRD FR-01 (Strict classification): "marked" hanya true jika signalRatio, combinedFillRatio, DAN
+    // centerFillRatio ketiganya memenuhi threshold sekaligus (AND ketat, tanpa jalur OR alternatif).
+    // Ini menutup P-01 (bubble kosong/residu lolos) dan P-02 (coretan tepi meloloskan bubble lewat OR).
+    // PRD FR-02 (Center priority): combinedFillRatio memakai bobot pusat dominan (BUBBLE_THRESHOLD_BASE.centerWeight).
+    function shared_buildMetrics(opts, contextLabel = '') {
         const sorted = [...opts].sort((a, b) => b.d - a.d);
         let bgNoise = 0, noiseSamples = 0;
         for (let i = Math.max(1, Math.floor(sorted.length / 2)); i < sorted.length; i++) {
@@ -844,23 +930,30 @@
             noiseSamples++;
         }
         const effectiveNoise = Math.max(noiseSamples > 0 ? (bgNoise / noiseSamples) : 0, sorted[0] ? sorted[0].area * 0.02 : 1);
-        return opts.map(opt => ({
-            ...opt,
-            fillRatio: opt.area ? (opt.d / opt.area) : 0,
-            centerFillRatio: opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0,
-            combinedFillRatio: ((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.64) + ((opt.area ? (opt.d / opt.area) : 0) * 0.36),
-            signalRatio: opt.area > 0 ? (opt.d / Math.max(effectiveNoise, 1)) : 0,
-            marked: opt.area > 0
-                && (opt.d / Math.max(effectiveNoise, 1)) >= getBubbleSignalRatio()
-                && (((opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) * 0.64) + ((opt.area ? (opt.d / opt.area) : 0) * 0.36)) >= getBubbleCombinedFillRatio()
-                && (
-                    (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= getBubbleCenterFillRatio()
-                    || (
-                        (opt.area ? (opt.d / opt.area) : 0) >= getBubbleMarkedFillRatio()
-                        && (opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0) >= (getBubbleCenterFillRatio() * 0.78)
-                    )
-                )
-        }));
+        const centerWeight = BUBBLE_THRESHOLD_BASE.centerWeight;
+        const outerWeight = BUBBLE_THRESHOLD_BASE.outerWeight;
+        const signalThreshold = getBubbleSignalRatio();
+        const centerThreshold = getBubbleCenterFillRatio();
+        const combinedThreshold = getBubbleCombinedFillRatio();
+
+        const metrics = opts.map(opt => {
+            const fillRatio = opt.area ? (opt.d / opt.area) : 0;
+            const centerFillRatio = opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0;
+            const combinedFillRatio = (centerFillRatio * centerWeight) + (fillRatio * outerWeight);
+            const signalRatio = opt.area > 0 ? (opt.d / Math.max(effectiveNoise, 1)) : 0;
+
+            let reason = REASON.MARKED;
+            let marked = true;
+            if (!(opt.area > 0)) { marked = false; reason = REASON.NO_AREA; }
+            else if (signalRatio < signalThreshold) { marked = false; reason = REASON.SIGNAL_LOW; }
+            else if (centerFillRatio < centerThreshold) { marked = false; reason = REASON.CENTER_LOW; }
+            else if (combinedFillRatio < combinedThreshold) { marked = false; reason = REASON.COMBINED_LOW; }
+
+            return { ...opt, fillRatio, centerFillRatio, combinedFillRatio, signalRatio, marked, reason, source: currentScanSource };
+        });
+
+        recordDiagnostics(metrics, contextLabel);
+        return metrics;
     }
 
     function shared_drawKeyMarkers(ctx, opts, keyValues) {
@@ -889,34 +982,24 @@
         }
     }
 
-    function shared_evaluateSingleChoice(opts, ctx, keyToken = null) {
-        const metrics = shared_buildMetrics(opts);
+    // shared_evaluateSingleChoice() — dipakai untuk PG (Pilihan Ganda) dan seluruh kolom identitas
+    // (Nama, Kelas, Nomor Peserta), karena keduanya sama-sama bubble single-choice per kolom.
+    // PRD FR-03 / bagian 9.4 / AC-04: soft fallback yang menebak kandidat "paling gelap" saat tidak ada
+    // bubble memenuhi syarat SUDAH DINONAKTIFKAN. Jika tidak ada bubble marked, hasil tetap '-' (tidak menebak).
+    function shared_evaluateSingleChoice(opts, ctx, keyToken = null, contextLabel = '') {
+        const metrics = shared_buildMetrics(opts, contextLabel);
         const marked = metrics.filter(opt => opt.marked);
-        const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
-        const best = ranked[0];
-        const second = ranked[1];
         let selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
-        if (selected === '-' && best && second) {
-            const softEnough = best.signalRatio >= (getBubbleSignalRatio() * 0.82)
-                && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.9)
-                && (
-                    best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.74)
-                    || best.fillRatio >= (getBubbleMarkedFillRatio() * 1.02)
-                )
-                && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio()
-                && (best.signalRatio - second.signalRatio) >= 0.12;
-            if (softEnough) selected = best.v;
-        }
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
-        if (marked.length || selected !== '-') {
+        if (marked.length) {
             const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
-            (marked.length ? marked : [best]).filter(Boolean).forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
+            marked.forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
         }
         return selected;
     }
 
-    function shared_evaluateExclusiveChoice(opts, ctx, keyToken = null) {
-        const metrics = shared_buildMetrics(opts);
+    function shared_evaluateExclusiveChoice(opts, ctx, keyToken = null, contextLabel = '') {
+        const metrics = shared_buildMetrics(opts, contextLabel);
         const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
         const best = ranked[0];
         const second = ranked[1];
@@ -971,30 +1054,30 @@
         return selected;
     }
 
-    function shared_evaluateMultiChoice(opts, ctx, keyToken = '') {
-        const metrics = shared_buildMetrics(opts);
+    // shared_evaluateMultiChoice() — dipakai untuk PGK (Pilihan Ganda Kompleks).
+    // PRD FR-04 / bagian 9.5 / AC-06: softCandidates TIDAK LAGI dipromosikan otomatis menjadi jawaban.
+    // Kandidat lemah yang mendekati ambang tetap direkam sebagai status REVIEW (diagnostik/kalibrasi saja),
+    // bukan MARKED — residu arsiran tidak lagi bisa "menyelinap" menjadi jawaban lewat toleransi ini.
+    function shared_evaluateMultiChoice(opts, ctx, keyToken = '', contextLabel = '') {
+        const metrics = shared_buildMetrics(opts, contextLabel);
         const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
-        const expectedCount = Math.max(1, String(keyToken || '').length);
         const best = ranked[0];
-        let marked = metrics.filter(opt => opt.marked);
+        const marked = metrics.filter(opt => opt.marked);
 
-        const softCandidates = ranked.filter((opt, index) => {
-            if (marked.some(mark => mark.v === opt.v)) return false;
-            if (index >= Math.max(expectedCount + 1, 3)) return false;
-            const signalEnough = opt.signalRatio >= (getBubbleSignalRatio() * 0.76);
-            const combinedEnough = opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.86);
-            const fillEnough = opt.centerFillRatio >= (getBubbleCenterFillRatio() * 0.7)
-                || opt.fillRatio >= (getBubbleMarkedFillRatio() * 1.02);
-            const closeToBest = best
-                ? (opt.combinedFillRatio >= (best.combinedFillRatio * 0.74) || opt.signalRatio >= (best.signalRatio * 0.74))
-                : false;
-            return signalEnough && combinedEnough && fillEnough && closeToBest;
-        });
-
-        if (!marked.length && softCandidates.length) {
-            marked = softCandidates.slice(0, Math.max(expectedCount, 2));
-        } else if (marked.length < expectedCount && softCandidates.length) {
-            marked = [...marked, ...softCandidates.slice(0, expectedCount - marked.length)];
+        if (diagnosticModeEnabled) {
+            const reviewCandidates = ranked.filter(opt => {
+                if (marked.some(mark => mark.v === opt.v)) return false;
+                if (opt.reason === REASON.NO_AREA) return false;
+                const signalEnough = opt.signalRatio >= (getBubbleSignalRatio() * 0.76);
+                const combinedEnough = opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.86);
+                const fillEnough = opt.centerFillRatio >= (getBubbleCenterFillRatio() * 0.7)
+                    || opt.fillRatio >= (getBubbleMarkedFillRatio() * 1.02);
+                const closeToBest = best
+                    ? (opt.combinedFillRatio >= (best.combinedFillRatio * 0.74) || opt.signalRatio >= (best.signalRatio * 0.74))
+                    : false;
+                return signalEnough && combinedEnough && fillEnough && closeToBest;
+            }).map(opt => ({ ...opt, marked: false, reason: REASON.REVIEW }));
+            recordDiagnostics(reviewCandidates, `${contextLabel}:review`);
         }
 
         const selected = marked.length
@@ -1008,13 +1091,13 @@
         return selected;
     }
 
-    function shared_evaluateBinaryGroups(opts, ctx, keyToken = '') {
+    function shared_evaluateBinaryGroups(opts, ctx, keyToken = '', contextLabel = '') {
         const pairs = [];
         for (let i = 0; i + 1 < opts.length; i += 2) {
             pairs.push(opts.slice(i, i + 2));
         }
         if (!pairs.length) return '-';
-        const detectedParts = pairs.map((pair, index) => shared_evaluateExclusiveChoice(pair, ctx, String(keyToken || '').charAt(index) || null));
+        const detectedParts = pairs.map((pair, index) => shared_evaluateExclusiveChoice(pair, ctx, String(keyToken || '').charAt(index) || null, `${contextLabel}.${index + 1}`));
         return detectedParts.join('');
     }
 
@@ -1033,7 +1116,7 @@
                 const cell = shared_getGridCell(grid, designerToGridRow(designerRow), designerToGridCol(designerCol));
                 opts.push({ v: labels[opt] || '', d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy });
             }
-            const selected = shared_evaluateSingleChoice(opts, ctx, null);
+            const selected = shared_evaluateSingleChoice(opts, ctx, null, `IDENTITAS:${cfg.title || '-'}#${idx + 1}`);
             result.push(selected === '-' || selected === '*' ? ' ' : selected);
         }
         return result.join('').trim() || '-';
@@ -1088,10 +1171,11 @@
                 if (!keyToken) return;
                 questionCount++;
                 let detected = '-';
-                if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken);
-                else if (section.mode === 'binary_groups') detected = shared_evaluateBinaryGroups(opts, ctx, keyToken);
-                else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken);
-                else detected = shared_evaluateSingleChoice(opts, ctx, keyToken);
+                const contextLabel = `${section.short}#${question.number}`;
+                if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken, contextLabel);
+                else if (section.mode === 'binary_groups') detected = shared_evaluateBinaryGroups(opts, ctx, keyToken, contextLabel);
+                else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken, contextLabel);
+                else detected = shared_evaluateSingleChoice(opts, ctx, keyToken, contextLabel);
                 sectionAnswers.push(`${question.number}-${detected}`);
                 if (section.mode === 'binary_groups') {
                     const emptyToken = '-'.repeat(Math.max(1, keyToken.length));
@@ -1330,6 +1414,7 @@
 
     function cam_performExtraction(warpedMat) {
         currentScanSource = 'camera';
+        resetDiagnostics();
         let ctx = resultCanvas.getContext('2d');
         let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
@@ -1380,6 +1465,7 @@
             let peserta = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.no_peserta, NUMBERS, ctx);
             const keyInfo = collectAnswerKeysForVisibleSections();
             let scoreData = shared_gradeAnswers(gridData, ctx, keyInfo.keys);
+            logDiagnosticsSummary('[KAMERA]');
 
             let existingIndex = resultData.findIndex(d => d.peserta === peserta && d.kelas === kelas && peserta !== "-");
             let dataRow = normalizeStoredResultRow({ name, kelas, peserta, ...scoreData });
@@ -1792,6 +1878,7 @@
 
     function up_performExtraction(warpedMat) {
         currentScanSource = 'upload';
+        resetDiagnostics();
         let ctx = resultCanvas.getContext('2d');
         let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
@@ -1842,6 +1929,7 @@
             let peserta = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.no_peserta, NUMBERS, ctx);
             const keyInfo = collectAnswerKeysForVisibleSections();
             let scoreData = shared_gradeAnswers(gridData, ctx, keyInfo.keys);
+            logDiagnosticsSummary('[UPLOAD]');
 
             let existingIndex = resultData.findIndex(d => d.peserta === peserta && d.kelas === kelas && peserta !== "-");
             let dataRow = normalizeStoredResultRow({ name, kelas, peserta, ...scoreData });
@@ -2334,7 +2422,16 @@
         applyLayoutConfig,
         applyPaperConfig,
         getPaperConfig: () => ({ ...paperConfig }),
-        getLayoutConfig: () => deepCopy(activeLayoutConfig)
+        getLayoutConfig: () => deepCopy(activeLayoutConfig),
+        getLastDiagnostics: () => deepCopy(lastDiagnostics),
+        getDiagnosticsSummary: () => summarizeDiagnostics(),
+        setDiagnosticMode: (enabled) => {
+            diagnosticModeEnabled = !!enabled;
+            const checkbox = document.getElementById('chk-diagnostic-mode');
+            if (checkbox) checkbox.checked = diagnosticModeEnabled;
+            return diagnosticModeEnabled;
+        },
+        getThresholdConfig: () => deepCopy(BUBBLE_THRESHOLD_BASE)
     };
 
     try {
