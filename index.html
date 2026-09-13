@@ -33,7 +33,7 @@
             <div id="cv-status" class="flex items-center gap-2 bg-slate-800 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium border border-slate-700">
                 <div class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div> Engine OpenCV sedang dimuat...
             </div>
-            <label class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-lg text-[10px] md:text-xs font-semibold border border-slate-700 cursor-pointer select-none text-slate-300" title="Rekam fillRatio, centerFillRatio, combinedFillRatio, signalRatio, dan alasan keputusan tiap bubble ke console browser untuk kalibrasi threshold (PRD bagian 10). Non-aktif secara default.">
+            <label class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-lg text-[10px] md:text-xs font-semibold border border-slate-700 cursor-pointer select-none text-slate-300" title="Rekam proporsi arsiran tiap bubble beserta alasan keputusan ke console browser (F12), berikut ambang otomatis dan mutu kisi lembar ini. Non-aktif secara default.">
                 <input type="checkbox" id="chk-diagnostic-mode" class="accent-emerald-500">
                 Mode Diagnostik
             </label>
@@ -307,10 +307,10 @@
     };
     const DEFAULT_BUBBLE_CONFIG = { diameterRatio: 0.72, strokeWidth: 1.1, fontSize: 9.5, fontWeight: 500 };
 
-    // === PRD "Perbaikan Akurasi Deteksi Arsiran LJK" v1.0 (13 Sep 2026) — Blok Konfigurasi Threshold Terpusat (FR-05) ===
-    // Seluruh angka dasar klasifikasi arsiran dikumpulkan di satu tempat agar mudah dikalibrasi ulang
-    // dengan dataset LJK nyata (lihat PRD bagian 9.2 & 11). Nilai di bawah adalah "Baseline awal" PRD,
-    // BUKAN angka final — silakan sesuaikan berdasarkan hasil kalibrasi (bagian 14, tahap T5).
+    // === Parameter warisan (mesin V1) ===
+    // Mesin V2 menentukan ambang arsiran secara otomatis per lembar (lihat ENG dan
+    // eng_otsuThreshold). Nilai di bawah dipertahankan hanya agar helper lama tetap
+    // valid dan tidak dipakai lagi sebagai penentu jawaban.
     const BUBBLE_THRESHOLD_BASE = {
         markedFillRatio: 0.18,      // dari 0.14 -> 0.18 (PRD 9.2)
         signalRatio: 2.80,          // dari 2.45 -> 2.80 (PRD 9.2)
@@ -327,6 +327,7 @@
         CENTER_LOW: 'CENTER_LOW',
         COMBINED_LOW: 'COMBINED_LOW',
         MARKED: 'MARKED',
+        MARKED_FAINT: 'MARKED_FAINT',
         REVIEW: 'REVIEW'
     };
     const KEY_STORAGE_KEY = 'ljk-suite-answer-keys-v2';
@@ -375,7 +376,7 @@
         if (!diagnosticModeEnabled) return;
         const summary = summarizeDiagnostics();
         const parts = Object.keys(summary).map(key => `${key}=${summary[key]}`).join(', ');
-        logAI(`${prefix} [DIAGNOSTIK] Sumber: ${currentScanSource}. Total bubble dievaluasi: ${lastDiagnostics.length}. ${parts || 'Tidak ada data.'} (detail lengkap: console browser / window.ScannerApp.getLastDiagnostics()).`);
+        logAI(`${prefix} [DIAGNOSTIK] Sumber: ${currentScanSource}. Bubble dievaluasi: ${lastDiagnostics.length}. Ambang otomatis: ${engFillThreshold.toFixed(3)}. Mutu kisi: ${(engLastQuality * 100).toFixed(0)}%. ${parts || 'Tidak ada data.'} (detail: console browser / window.ScannerApp.getLastDiagnostics()).`);
         try { console.table(lastDiagnostics); } catch (err) { console.log(lastDiagnostics); }
     }
 
@@ -917,41 +918,669 @@
         return { density: 0, area: 1, centerDensity: 0, centerArea: 1, cx: START_X + (col * GRID_SIZE) + (GRID_SIZE / 2), cy: START_Y + (row * GRID_SIZE) + (GRID_SIZE / 2) };
     }
 
-    // shared_buildMetrics() — titik klasifikasi utama arsiran (PRD bagian 7 & 9.3).
-    // PRD FR-01 (Strict classification): "marked" hanya true jika signalRatio, combinedFillRatio, DAN
-    // centerFillRatio ketiganya memenuhi threshold sekaligus (AND ketat, tanpa jalur OR alternatif).
-    // Ini menutup P-01 (bubble kosong/residu lolos) dan P-02 (coretan tepi meloloskan bubble lewat OR).
-    // PRD FR-02 (Center priority): combinedFillRatio memakai bobot pusat dominan (BUBBLE_THRESHOLD_BASE.centerWeight).
-    function shared_buildMetrics(opts, contextLabel = '') {
-        const sorted = [...opts].sort((a, b) => b.d - a.d);
-        let bgNoise = 0, noiseSamples = 0;
-        for (let i = Math.max(1, Math.floor(sorted.length / 2)); i < sorted.length; i++) {
-            bgNoise += sorted[i].d;
-            noiseSamples++;
-        }
-        const effectiveNoise = Math.max(noiseSamples > 0 ? (bgNoise / noiseSamples) : 0, sorted[0] ? sorted[0].area * 0.02 : 1);
-        const centerWeight = BUBBLE_THRESHOLD_BASE.centerWeight;
-        const outerWeight = BUBBLE_THRESHOLD_BASE.outerWeight;
-        const signalThreshold = getBubbleSignalRatio();
-        const centerThreshold = getBubbleCenterFillRatio();
-        const combinedThreshold = getBubbleCombinedFillRatio();
 
+    // ==================================================================
+    // ENGINE V2 - mesin deteksi presisi (kalibrasi dari LJK nyata)
+    // Dirancang & diverifikasi terhadap foto kamera (potret & lanskap),
+    // hasil pindai PDF, serta kondisi cahaya tidak merata.
+    // ------------------------------------------------------------------
+    // Tiga pilar:
+    //  1. Deteksi 6 fiducial yang kebal rotasi (termasuk kertas terputar 90/180).
+    //  2. Auto-kalibrasi kisi (pitch + offset) setelah warp -> koreksi geser/skala.
+    //  3. Pengukuran arsiran berbasis cakram + perataan cahaya -> ambang bimodal.
+    // ==================================================================
+    const ENG = {
+        DETECT_MAX_DIM: 1400,
+        OUTER_R: 0.42,          // jari-jari cakram luar (x pitch)
+        INNER_R: 0.26,          // jari-jari cakram pusat (x pitch)
+        FILL_T_DEFAULT: 0.60,   // ambang arsiran (dari distribusi LJK nyata)
+        FILL_T_MIN: 0.45,
+        FILL_T_MAX: 0.72,
+        PITCH_SPAN: 0.09,
+        PITCH_STEPS: 97,
+        MAX_HYPOTHESES: 8,
+        FAINT_FLOOR: 0.45,        // batas bawah mutlak untuk arsiran samar
+        FAINT_DOMINANCE: 1.6,     // harus sekian kali lebih pekat dari saingan
+        FAINT_RIVAL_MAX: 0.35     // saingan harus benar-benar bersih
+    };
+    let engFillThreshold = ENG.FILL_T_DEFAULT;
+    let engLastLattice = null;
+    let engLastAffine = null;
+    let engLastQuality = 0;
+
+    // Rasio posisi fiducial tengah terhadap rentang atas-bawah.
+    // Nilainya != 0.5, dan justru ketidaksimetrisan inilah yang dipakai
+    // untuk menentukan mana sisi ATAS dan mana sisi BAWAH secara pasti,
+    // sehingga LJK terbalik 180 derajat tidak perlu ditebak lagi.
+    function eng_fidMidRatio() {
+        return clampFloatValue(getSplitRows() / Math.max(1, getWarpRows()), 0.678, 0.15, 0.9);
+    }
+    // Perbandingan tinggi:lebar bidang antar-fiducial (dipakai saat menebak sisi seberang).
+    function eng_fidAspectHW() {
+        const p = activeLayoutConfig?.pengaturan_kertas || {};
+        const pw = Number(p.paper_width_mm), ph = Number(p.paper_height_mm);
+        const gc = paperConfig.gridCols, gr = paperConfig.gridRows;
+        if (Number.isFinite(pw) && Number.isFinite(ph) && pw > 0 && ph > 0 && gc > 2 && gr > 2) {
+            const wmm = (gc - 2) * pw / gc, hmm = (gr - 2) * ph / gr;
+            if (wmm > 0) return hmm / wmm;
+        }
+        return getWarpRows() / Math.max(1, getWarpCols());
+    }
+
+    function eng_percentile(mat, p) {
+        // ROI Mat tidak kontigu; .data-nya menunjuk buffer induk. Salin dulu bila perlu.
+        let m = mat, tmp = null;
+        if (!mat.isContinuous || !mat.isContinuous()) { tmp = mat.clone(); m = tmp; }
+        const d = m.data, hist = new Int32Array(256);
+        for (let i = 0; i < d.length; i++) hist[d[i]]++;
+        const target = d.length * p / 100;
+        if (tmp) tmp.delete();
+        let acc = 0;
+        for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= target) return v; }
+        return 255;
+    }
+
+    function eng_pushContourStats(cnts, diag, out, extentMin) {
+        for (let i = 0; i < cnts.size(); i++) {
+            const c = cnts.get(i);
+            const r = cv.boundingRect(c);
+            if (r.width >= 4 && r.height >= 4) {
+                const side = (r.width + r.height) / 2;
+                const asp = r.width / r.height;
+                if (side > 0.004 * diag && side < 0.055 * diag && asp > 0.6 && asp < 1.7) {
+                    const area = cv.contourArea(c), rect = r.width * r.height;
+                    const ext = rect ? area / rect : 0;
+                    if (ext >= extentMin) {
+                        const m = cv.moments(c);
+                        if (m.m00 !== 0) out.push({ cx: m.m10 / m.m00, cy: m.m01 / m.m00, side: side, extent: ext });
+                    }
+                }
+            }
+            c.delete();
+        }
+    }
+
+    // Fiducial = kotak HITAM PEKAT dan PADAT. "extent" (luas/kotak pembatas)
+    // memisahkannya dengan tegas dari bubble jawaban (lingkaran/cincin).
+    function eng_findCandidates(gray) {
+        const w = gray.cols, h = gray.rows, diag = Math.hypot(w, h);
+        const blur = new cv.Mat();
+        cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
+        const bins = [];
+        let m = new cv.Mat(); cv.threshold(blur, m, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU); bins.push(m);
+        let bs = Math.max(15, Math.floor(Math.min(w, h) * 0.10)); if (bs % 2 === 0) bs++;
+        m = new cv.Mat(); cv.adaptiveThreshold(blur, m, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, bs, 12); bins.push(m);
+        [5, 10, 20].forEach(p => {
+            const t = eng_percentile(blur, p);
+            const mm = new cv.Mat(); cv.threshold(blur, mm, t, 255, cv.THRESH_BINARY_INV); bins.push(mm);
+        });
+        const out = [];
+        const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+        bins.forEach(b => {
+            cv.morphologyEx(b, b, cv.MORPH_CLOSE, k);
+            const cnts = new cv.MatVector(), hier = new cv.Mat();
+            cv.findContours(b, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            eng_pushContourStats(cnts, diag, out, 0.70);
+            cnts.delete(); hier.delete(); b.delete();
+        });
+        k.delete(); blur.delete();
+        out.sort((a, b) => b.extent - a.extent);
+        const keep = [];
+        for (const d of out) {
+            let ok = true;
+            for (const kp of keep) {
+                if (Math.hypot(d.cx - kp.cx, d.cy - kp.cy) <= 0.8 * Math.max(d.side, kp.side)) { ok = false; break; }
+            }
+            if (ok) keep.push(d);
+            if (keep.length >= 45) break;
+        }
+        return keep;
+    }
+
+    // Tiga fiducial pada satu sisi selalu segaris, dengan yang tengah pada
+    // rasio eng_fidMidRatio() dari ujung atas. Pola inilah yang dicari.
+    function eng_findTriples(pts) {
+        const midRatio = eng_fidMidRatio();
+        const res = [], n = pts.length, tolLine = 0.07, tolRatio = 0.085;
+        for (let i = 0; i < n; i++) {
+            for (let k = i + 1; k < n; k++) {
+                const ax = pts[i].cx, ay = pts[i].cy, cx = pts[k].cx, cy = pts[k].cy;
+                const L = Math.hypot(cx - ax, cy - ay);
+                if (L < 1) continue;
+                for (let j = 0; j < n; j++) {
+                    if (j === i || j === k) continue;
+                    const bx = pts[j].cx, by = pts[j].cy;
+                    if (Math.abs((cx - ax) * (ay - by) - (ax - bx) * (cy - ay)) / L / L > tolLine) continue;
+                    const t = ((bx - ax) * (cx - ax) + (by - ay) * (cy - ay)) / (L * L);
+                    if (Math.abs(t - midRatio) <= tolRatio) res.push({ a: i, m: j, b: k, L: L });
+                    else if (Math.abs((1 - t) - midRatio) <= tolRatio) res.push({ a: k, m: j, b: i, L: L });
+                }
+            }
+        }
+        res.sort((x, y) => y.L - x.L);
+        return res;
+    }
+
+    function eng_refinePoint(gray, px, py, rad) {
+        const r = Math.max(6, Math.round(rad));
+        const x0 = Math.max(0, Math.round(px - r)), y0 = Math.max(0, Math.round(py - r));
+        const x1 = Math.min(gray.cols, Math.round(px + r)), y1 = Math.min(gray.rows, Math.round(py + r));
+        if (x1 - x0 < 6 || y1 - y0 < 6) return null;
+        const roi = gray.roi(new cv.Rect(x0, y0, x1 - x0, y1 - y0));
+        let best = null, bestScore = -1e9;
+        [10, 25, 45].forEach(p => {
+            const t = eng_percentile(roi, p);
+            const b = new cv.Mat();
+            cv.threshold(roi, b, t, 255, cv.THRESH_BINARY_INV);
+            const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+            cv.morphologyEx(b, b, cv.MORPH_CLOSE, k); k.delete();
+            const cnts = new cv.MatVector(), hier = new cv.Mat();
+            cv.findContours(b, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            for (let i = 0; i < cnts.size(); i++) {
+                const c = cnts.get(i);
+                const rr = cv.boundingRect(c);
+                if (rr.width >= 4 && rr.height >= 4) {
+                    const side = (rr.width + rr.height) / 2, asp = rr.width / rr.height;
+                    if (side > 0.35 * r && side < 1.5 * r && asp > 0.55 && asp < 1.8) {
+                        const area = cv.contourArea(c), rect = rr.width * rr.height;
+                        const ext = rect ? area / rect : 0;
+                        if (ext >= 0.62) {
+                            const mm = cv.moments(c);
+                            if (mm.m00 !== 0) {
+                                const gx = x0 + mm.m10 / mm.m00, gy = y0 + mm.m01 / mm.m00;
+                                const sub = roi.roi(new cv.Rect(rr.x, rr.y, rr.width, rr.height));
+                                const meanv = cv.mean(sub)[0]; sub.delete();
+                                const sc = ext * 2.0 - Math.hypot(gx - px, gy - py) / Math.max(1, r) - meanv / 255.0;
+                                if (sc > bestScore) { bestScore = sc; best = { x: gx, y: gy }; }
+                            }
+                        }
+                    }
+                }
+                c.delete();
+            }
+            cnts.delete(); hier.delete(); b.delete();
+        });
+        roi.delete();
+        return best;
+    }
+
+    function eng_buildHypotheses(gray) {
+        const cands = eng_findCandidates(gray);
+        const tri = eng_findTriples(cands);
+        if (!tri.length) return [];
+        const ASP = eng_fidAspectHW();
+        const P = i => [cands[i].cx, cands[i].cy];
+        const sides = cands.map(c => c.side).sort((a, b) => a - b);
+        const sidepx = sides.length ? sides[Math.floor(sides.length / 2)] : 10;
+        const hyps = [];
+        // A) dua sisi lengkap terdeteksi
+        const scored = [];
+        const top = tri.slice(0, 14);
+        for (let i = 0; i < top.length; i++) {
+            for (let j = i + 1; j < top.length; j++) {
+                const t1 = top[i], t2 = top[j];
+                const ids = new Set([t1.a, t1.m, t1.b, t2.a, t2.m, t2.b]);
+                if (ids.size !== 6) continue;
+                if (!(t1.L / t2.L > 0.82 && t1.L / t2.L < 1.22)) continue;
+                const A1 = P(t1.a), B1 = P(t1.b), A2 = P(t2.a), B2 = P(t2.b);
+                const d1 = [B1[0] - A1[0], B1[1] - A1[1]], d2 = [B2[0] - A2[0], B2[1] - A2[1]];
+                const n1 = Math.hypot(d1[0], d1[1]), n2 = Math.hypot(d2[0], d2[1]);
+                const cosang = Math.abs((d1[0] * d2[0] + d1[1] * d2[1]) / (n1 * n2));
+                if (cosang < 0.960) continue;
+                const width = (Math.hypot(A2[0] - A1[0], A2[1] - A1[1]) + Math.hypot(B2[0] - B1[0], B2[1] - B1[1])) / 2;
+                if (width < 1) continue;
+                const hw = ((t1.L + t2.L) / 2) / width;
+                if (!(hw > 0.72 * ASP && hw < 1.40 * ASP)) continue;
+                const sc = -Math.abs(Math.log(hw / ASP)) * 3 - Math.abs(Math.log(t1.L / t2.L)) + cosang + Math.log(Math.max(t1.L, t2.L)) * 0.6;
+                const down = [(d1[0] + d2[0]) / 2, (d1[1] + d2[1]) / 2];
+                const across = [A2[0] - A1[0], A2[1] - A1[1]];
+                const cz = down[0] * across[1] - down[1] * across[0];
+                const L3 = cz < 0 ? t1 : t2, R3 = cz < 0 ? t2 : t1;
+                scored.push({
+                    sc: sc, h: {
+                        TL: P(L3.a), ML: P(L3.m), BL: P(L3.b),
+                        TR: P(R3.a), MR: P(R3.m), BR: P(R3.b), mode: 'dua-sisi'
+                    }
+                });
+            }
+        }
+        scored.sort((a, b) => b.sc - a.sc);
+        scored.slice(0, 5).forEach(s => hyps.push(s.h));
+        // B) satu sisi terdeteksi + sisi seberang diprediksi lalu dicari ulang secara lokal
+        tri.slice(0, 8).forEach(t => {
+            const A = P(t.a), M = P(t.m), B = P(t.b);
+            const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy);
+            if (L < 1) return;
+            [1, -1].forEach(sign => {
+                const ux = dx / L, uy = dy / L;
+                const nx = -uy * sign, ny = ux * sign;
+                const wd = L / ASP;
+                const pred = [A, M, B].map(p => [p[0] + nx * wd, p[1] + ny * wd]);
+                const got = []; let hits = 0;
+                pred.forEach(q => {
+                    const rr = eng_refinePoint(gray, q[0], q[1], Math.max(sidepx * 1.7, L * 0.035));
+                    if (rr) { got.push([rr.x, rr.y]); hits++; } else got.push([q[0], q[1]]);
+                });
+                if (hits < 1) return;
+                const cz = dx * (got[0][1] - A[1]) - dy * (got[0][0] - A[0]);
+                const Ls = cz < 0 ? [A, M, B] : got, Rs = cz < 0 ? got : [A, M, B];
+                hyps.push({ TL: Ls[0], ML: Ls[1], BL: Ls[2], TR: Rs[0], MR: Rs[1], BR: Rs[2], mode: 'satu-sisi+prediksi(' + hits + ')' });
+            });
+        });
+        const uniq = [];
+        hyps.forEach(h => {
+            const same = uniq.some(u => ['TL', 'TR', 'ML', 'MR', 'BL', 'BR']
+                .every(k => Math.hypot(u[k][0] - h[k][0], u[k][1] - h[k][1]) < 8));
+            if (!same && uniq.length < ENG.MAX_HYPOTHESES) uniq.push(h);
+        });
+        return uniq;
+    }
+
+    // ---------- Auto-kalibrasi kisi -----------------------------------
+    // Setelah warp, posisi bubble diukur langsung dari citra. Ini menutup
+    // sisa galat penempatan fiducial (geseran maupun peregangan skala),
+    // yang kalau dibiarkan membuat pembacaan meleset satu baris.
+    function eng_bubbleCentroids(warped) {
+        const g = new cv.Mat();
+        cv.cvtColor(warped, g, cv.COLOR_RGBA2GRAY, 0);
+        cv.GaussianBlur(g, g, new cv.Size(3, 3), 0);
+        const th = new cv.Mat();
+        cv.adaptiveThreshold(g, th, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 9);
+        const cnts = new cv.MatVector(), hier = new cv.Mat();
+        cv.findContours(th, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        const pts = [];
+        const G = GRID_SIZE;
+        for (let i = 0; i < cnts.size(); i++) {
+            const c = cnts.get(i);
+            const r = cv.boundingRect(c);
+            if (r.width > 0.42 * G && r.width < 1.0 * G && r.height > 0.42 * G && r.height < 1.0 * G) {
+                const asp = r.width / r.height;
+                if (asp > 0.70 && asp < 1.42) {
+                    const peri = cv.arcLength(c, true);
+                    if (peri > 0) {
+                        const circ = 4 * Math.PI * cv.contourArea(c) / (peri * peri);
+                        if (circ >= 0.5) {
+                            const m = cv.moments(c);
+                            if (m.m00 !== 0) pts.push([m.m10 / m.m00, m.m01 / m.m00]);
+                        }
+                    }
+                }
+            }
+            c.delete();
+        }
+        cnts.delete(); hier.delete(); th.delete(); g.delete();
+        return pts;
+    }
+
+    function eng_fitAxis(vals, base) {
+        if (vals.length < 20) return { pitch: base, off: base / 2, conf: 0 };
+        let bestConc = -1, bestPitch = base, bestAng = 0;
+        for (let i = 0; i < ENG.PITCH_STEPS; i++) {
+            const p = base * (1 - ENG.PITCH_SPAN) + (2 * ENG.PITCH_SPAN * base) * i / (ENG.PITCH_STEPS - 1);
+            const k = 2 * Math.PI / p;
+            let s = 0, c = 0;
+            for (let v = 0; v < vals.length; v++) { const a = vals[v] * k; s += Math.sin(a); c += Math.cos(a); }
+            s /= vals.length; c /= vals.length;
+            const conc = Math.hypot(s, c);
+            if (conc > bestConc) { bestConc = conc; bestPitch = p; bestAng = Math.atan2(s, c); }
+        }
+        if (bestAng < 0) bestAng += 2 * Math.PI;
+        return { pitch: bestPitch, off: bestAng * bestPitch / (2 * Math.PI), conf: bestConc };
+    }
+
+    function eng_fitLattice(warped) {
+        const pts = eng_bubbleCentroids(warped);
+        if (pts.length < 25) return null;
+        const fx = eng_fitAxis(pts.map(p => p[0]), GRID_SIZE);
+        const fy = eng_fitAxis(pts.map(p => p[1]), GRID_SIZE);
+        return {
+            pitchX: fx.pitch, offX: fx.off, pitchY: fy.pitch, offY: fy.off,
+            conf: Math.min(fx.conf, fy.conf), n: pts.length
+        };
+    }
+
+    // Penjangkaran sekali di sel 0 lalu melangkah dengan pitch sebenarnya.
+    // (Membulatkan tiap sel secara terpisah membuat indeks melenceng ketika
+    //  pitch terukur berbeda dari nominal - penyebab pembacaan bergeser 1 baris.)
+    function eng_latticeCenter(lat, row, col) {
+        if (!lat) return { x: col * GRID_SIZE + GRID_SIZE / 2, y: row * GRID_SIZE + GRID_SIZE / 2 };
+        const k0x = Math.round((GRID_SIZE / 2 - lat.offX) / lat.pitchX);
+        const k0y = Math.round((GRID_SIZE / 2 - lat.offY) / lat.pitchY);
+        return { x: lat.offX + (k0x + col) * lat.pitchX, y: lat.offY + (k0y + row) * lat.pitchY };
+    }
+
+    // ---------- Pengukuran arsiran ------------------------------------
+    // Cahaya diratakan dulu (bagi dengan latar kabur) supaya bayangan dan
+    // pencahayaan miring tidak lagi menggeser ambang.
+    function eng_buildSampleMask(warped) {
+        const g = new cv.Mat();
+        cv.cvtColor(warped, g, cv.COLOR_RGBA2GRAY, 0);
+        cv.GaussianBlur(g, g, new cv.Size(3, 3), 0);
+        const bg = new cv.Mat();
+        let bk = Math.max(3, Math.round(GRID_SIZE * 2.0) * 6 + 1);
+        if (bk % 2 === 0) bk++;
+        cv.GaussianBlur(g, bg, new cv.Size(bk, bk), GRID_SIZE * 2.0, GRID_SIZE * 2.0, cv.BORDER_REPLICATE);
+        const flat = g.clone();
+        const gd = g.data, bd = bg.data, fd = flat.data;
+        for (let i = 0; i < gd.length; i++) {
+            const v = (gd[i] / (bd[i] + 1e-6)) * 180;
+            fd[i] = v > 255 ? 255 : (v < 0 ? 0 : v);
+        }
+        const th = new cv.Mat();
+        cv.adaptiveThreshold(flat, th, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 41, 12);
+        const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
+        cv.morphologyEx(th, th, cv.MORPH_OPEN, k);
+        k.delete(); g.delete(); bg.delete(); flat.delete();
+        return th;
+    }
+
+    function eng_buildDisc(pitch, rFrac) {
+        const s = Math.max(6, Math.round(pitch));
+        const c = (s - 1) / 2, rr = rFrac * pitch;
+        const dx = [], dy = [];
+        for (let y = 0; y < s; y++) {
+            for (let x = 0; x < s; x++) {
+                if (Math.hypot(x - c, y - c) <= rr) { dx.push(x); dy.push(y); }
+            }
+        }
+        return { size: s, dx: Int32Array.from(dx), dy: Int32Array.from(dy), n: dx.length };
+    }
+
+    function eng_countDisc(mask, x0, y0, disc) {
+        const data = mask.data, stride = mask.cols;
+        let cnt = 0;
+        for (let i = 0; i < disc.n; i++) {
+            if (data[(y0 + disc.dy[i]) * stride + (x0 + disc.dx[i])]) cnt++;
+        }
+        return cnt;
+    }
+
+    // Bangun seluruh kisi sel: hitung piksel arsiran pada cakram luar & pusat.
+    function eng_buildGridData(mask, lat, aff) {
+        const rows = getGridRowsCount(), cols = getGridColsCount();
+        const pitch = lat ? (lat.pitchX + lat.pitchY) / 2 : GRID_SIZE;
+        const dOut = eng_buildDisc(pitch, ENG.OUTER_R);
+        const dIn = eng_buildDisc(pitch, ENG.INNER_R);
+        const grid = [];
+        for (let r = 0; r < rows; r++) {
+            grid[r] = [];
+            for (let c = 0; c < cols; c++) {
+                const ctr = eng_cellCenter(aff, lat, r, c);
+                const x0o = Math.round(ctr.x - dOut.size / 2), y0o = Math.round(ctr.y - dOut.size / 2);
+                const x0i = Math.round(ctr.x - dIn.size / 2), y0i = Math.round(ctr.y - dIn.size / 2);
+                let dens = 0, cdens = 0;
+                const okO = x0o >= 0 && y0o >= 0 && x0o + dOut.size <= mask.cols && y0o + dOut.size <= mask.rows;
+                const okI = x0i >= 0 && y0i >= 0 && x0i + dIn.size <= mask.cols && y0i + dIn.size <= mask.rows;
+                if (okO) dens = eng_countDisc(mask, x0o, y0o, dOut);
+                if (okI) cdens = eng_countDisc(mask, x0i, y0i, dIn);
+                grid[r][c] = {
+                    density: dens, area: okO ? dOut.n : 0,
+                    centerDensity: cdens, centerArea: okI ? dIn.n : 0,
+                    cx: ctr.x, cy: ctr.y
+                };
+            }
+        }
+        return grid;
+    }
+
+    // Kumpulkan nilai arsiran hanya dari sel yang MEMANG bubble menurut desain,
+    // lalu tentukan ambang secara otomatis (Otsu) agar mengikuti kondisi lembar.
+    function eng_collectLayoutFills(grid) {
+        const vals = [];
+        const push = (r, c) => {
+            const cell = grid[r] && grid[r][c];
+            if (cell && cell.centerArea > 0) vals.push(cell.centerDensity / cell.centerArea);
+        };
+        const idn = activeLayoutConfig?.identitas || {};
+        ['nama', 'jenis_kelamin', 'no_peserta', 'kelas'].forEach(key => {
+            const cfg = idn[key];
+            if (!cfg || cfg.visible === false) return;
+            const layout = cfg.layout || 'V';
+            const count = layout === 'V' ? (Number(cfg.w) || 0) : (Number(cfg.h) || 0);
+            const opts = layout === 'V' ? (Number(cfg.h) || 0) : (Number(cfg.w) || 0);
+            for (let i = 0; i < count; i++) {
+                for (let o = 0; o < opts; o++) {
+                    const dc = layout === 'V' ? Number(cfg.c) + i : Number(cfg.c) + o;
+                    const dr = layout === 'V' ? Number(cfg.r) + o : Number(cfg.r) + i;
+                    push(designerToGridRow(dr), designerToGridCol(dc));
+                }
+            }
+        });
+        getVisibleAnswerSections().forEach(sec => {
+            sec.questions.forEach(q => q.options.forEach(o => push(designerToGridRow(o.r), designerToGridCol(o.c))));
+        });
+        return vals;
+    }
+
+    function eng_otsuThreshold(vals) {
+        if (vals.length < 40) return ENG.FILL_T_DEFAULT;
+        const BINS = 64, hist = new Int32Array(BINS);
+        vals.forEach(v => { let b = Math.floor(Math.max(0, Math.min(0.999, v)) * BINS); hist[b]++; });
+        const total = vals.length;
+        let sum = 0;
+        for (let i = 0; i < BINS; i++) sum += (i + 0.5) / BINS * hist[i];
+        let sumB = 0, wB = 0, best = -1, thr = ENG.FILL_T_DEFAULT;
+        for (let i = 0; i < BINS; i++) {
+            wB += hist[i];
+            if (wB === 0) continue;
+            const wF = total - wB;
+            if (wF === 0) break;
+            sumB += (i + 0.5) / BINS * hist[i];
+            const mB = sumB / wB, mF = (sum - sumB) / wF;
+            const between = wB * wF * (mB - mF) * (mB - mF);
+            if (between > best) { best = between; thr = (i + 1) / BINS; }
+        }
+        return clampFloatValue(thr, ENG.FILL_T_DEFAULT, ENG.FILL_T_MIN, ENG.FILL_T_MAX);
+    }
+
+    function eng_solve3(A, b) {
+        const M = [[A[0][0], A[0][1], A[0][2], b[0]],
+                   [A[1][0], A[1][1], A[1][2], b[1]],
+                   [A[2][0], A[2][1], A[2][2], b[2]]];
+        for (let i = 0; i < 3; i++) {
+            let piv = i;
+            for (let r = i + 1; r < 3; r++) if (Math.abs(M[r][i]) > Math.abs(M[piv][i])) piv = r;
+            if (Math.abs(M[piv][i]) < 1e-12) return null;
+            const t = M[i]; M[i] = M[piv]; M[piv] = t;
+            for (let r = 0; r < 3; r++) {
+                if (r === i) continue;
+                const f = M[r][i] / M[i][i];
+                for (let c = i; c < 4; c++) M[r][c] -= f * M[i][c];
+            }
+        }
+        return [M[0][3] / M[0][0], M[1][3] / M[1][1], M[2][3] / M[2][2]];
+    }
+
+    // Registrasi AFFINE kisi bubble: memodelkan skala, geser, rotasi sisa, DAN
+    // kemiringan (shear) yang tidak dapat diwakili model pitch+offset saja.
+    // Inilah yang membuat blok jawaban paling kanan tetap terkunci walau
+    // penempatan fiducial sedikit meleset.
+    function eng_fitAffine(warped, lat) {
+        if (!lat) return null;
+        const pts = eng_bubbleCentroids(warped);
+        if (pts.length < 30) return null;
+        const k0x = Math.round((GRID_SIZE / 2 - lat.offX) / lat.pitchX);
+        const k0y = Math.round((GRID_SIZE / 2 - lat.offY) / lat.pitchY);
+        const pitch = (lat.pitchX + lat.pitchY) / 2;
+        let P = pts.map(p => ({
+            x: p[0], y: p[1],
+            ix: Math.round((p[0] - lat.offX) / lat.pitchX) - k0x,
+            iy: Math.round((p[1] - lat.offY) / lat.pitchY) - k0y
+        }));
+        let cx = null, cy = null;
+        for (let it = 0; it < 4; it++) {
+            let Saa = 0, Sab = 0, Sa = 0, Sbb = 0, Sb = 0, Sn = 0, Sax = 0, Sbx = 0, Sx = 0, Say = 0, Sby = 0, Sy = 0;
+            P.forEach(p => {
+                Saa += p.ix * p.ix; Sab += p.ix * p.iy; Sa += p.ix;
+                Sbb += p.iy * p.iy; Sb += p.iy; Sn += 1;
+                Sax += p.ix * p.x; Sbx += p.iy * p.x; Sx += p.x;
+                Say += p.ix * p.y; Sby += p.iy * p.y; Sy += p.y;
+            });
+            const A = [[Saa, Sab, Sa], [Sab, Sbb, Sb], [Sa, Sb, Sn]];
+            cx = eng_solve3(A, [Sax, Sbx, Sx]);
+            cy = eng_solve3(A, [Say, Sby, Sy]);
+            if (!cx || !cy) return null;
+            const kept = P.filter(p => {
+                const px = cx[0] * p.ix + cx[1] * p.iy + cx[2];
+                const py = cy[0] * p.ix + cy[1] * p.iy + cy[2];
+                return Math.hypot(p.x - px, p.y - py) < 0.32 * pitch;
+            });
+            if (kept.length < 25) break;
+            if (it < 3) {
+                const det = cx[0] * cy[1] - cx[1] * cy[0];
+                if (Math.abs(det) < 1e-9) break;
+                P = kept.map(p => {
+                    const dx = p.x - cx[2], dy = p.y - cy[2];
+                    return {
+                        x: p.x, y: p.y,
+                        ix: Math.round((cy[1] * dx - cx[1] * dy) / det),
+                        iy: Math.round((-cy[0] * dx + cx[0] * dy) / det)
+                    };
+                });
+            } else P = kept;
+        }
+        return { cx: cx, cy: cy, n: P.length };
+    }
+
+    function eng_cellCenter(aff, lat, row, col) {
+        if (!aff) return eng_latticeCenter(lat, row, col);
+        return {
+            x: aff.cx[0] * col + aff.cx[1] * row + aff.cx[2],
+            y: aff.cy[0] * col + aff.cy[1] * row + aff.cy[2]
+        };
+    }
+
+    // Letakkan ambang di TENGAH celah kosong antara kelompok "tidak diarsir"
+    // dan "diarsir", bukan menempel di salah satu tepinya.
+    function eng_gapThreshold(vals, otsuT) {
+        const low = vals.filter(v => v < otsuT).sort((a, b) => a - b);
+        const high = vals.filter(v => v >= otsuT).sort((a, b) => a - b);
+        if (low.length < 5 || high.length < 5) return otsuT;
+        const topLow = low[Math.min(low.length - 1, Math.floor(low.length * 0.98))];
+        const botHigh = high[Math.floor(high.length * 0.02)];
+        if (botHigh <= topLow) return otsuT;
+        return clampFloatValue((topLow + botHigh) / 2, otsuT, ENG.FILL_T_MIN, ENG.FILL_T_MAX);
+    }
+
+    function eng_dualWarp(src, fid) {
+        const full = new cv.Mat(getWarpHeight(), getWarpWidth(), cv.CV_8UC4, new cv.Scalar(255, 255, 255, 255));
+        const splitY = getSplitRows() * GRID_SIZE;
+        const botH = getWarpHeight() - splitY;
+        const W = getWarpWidth();
+        const sTop = cv.matFromArray(4, 1, cv.CV_32FC2, [fid.TL[0], fid.TL[1], fid.TR[0], fid.TR[1], fid.MR[0], fid.MR[1], fid.ML[0], fid.ML[1]]);
+        const dTop = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, W, 0, W, splitY, 0, splitY]);
+        const Mt = cv.getPerspectiveTransform(sTop, dTop);
+        const wTop = new cv.Mat();
+        cv.warpPerspective(src, wTop, Mt, new cv.Size(W, splitY));
+        const sBot = cv.matFromArray(4, 1, cv.CV_32FC2, [fid.ML[0], fid.ML[1], fid.MR[0], fid.MR[1], fid.BR[0], fid.BR[1], fid.BL[0], fid.BL[1]]);
+        const dBot = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, W, 0, W, botH, 0, botH]);
+        const Mb = cv.getPerspectiveTransform(sBot, dBot);
+        const wBot = new cv.Mat();
+        cv.warpPerspective(src, wBot, Mb, new cv.Size(W, botH));
+        const rTop = full.roi(new cv.Rect(0, 0, W, splitY)); wTop.copyTo(rTop); rTop.delete();
+        const rBot = full.roi(new cv.Rect(0, splitY, W, botH)); wBot.copyTo(rBot); rBot.delete();
+        sTop.delete(); dTop.delete(); Mt.delete(); wTop.delete();
+        sBot.delete(); dBot.delete(); Mb.delete(); wBot.delete();
+        return full;
+    }
+
+    // Pilih hipotesis fiducial TERBAIK dengan menguji hasil akhirnya:
+    // warp -> ukur keteraturan kisi bubble. Mesin menilai kerjanya sendiri.
+    function eng_detectAndWarp(src, logPrefix) {
+        const w = src.cols, h = src.rows;
+        const sc = ENG.DETECT_MAX_DIM / Math.max(w, h);
+        const small = new cv.Mat();
+        cv.resize(src, small, new cv.Size(Math.round(w * sc), Math.round(h * sc)));
+        const graySmall = new cv.Mat();
+        cv.cvtColor(small, graySmall, cv.COLOR_RGBA2GRAY, 0);
+        const grayFull = new cv.Mat();
+        cv.cvtColor(src, grayFull, cv.COLOR_RGBA2GRAY, 0);
+        let hyps = [];
+        try { hyps = eng_buildHypotheses(graySmall); } catch (err) { console.warn('hypotheses failed', err); }
+        let best = null;
+        const KEYS = ['TL', 'TR', 'ML', 'MR', 'BL', 'BR'];
+        for (let i = 0; i < hyps.length; i++) {
+            const hyp = hyps[i];
+            const span = Math.hypot(hyp.BL[0] - hyp.TL[0], hyp.BL[1] - hyp.TL[1]) / sc;
+            const rad = Math.max(10, span * 0.020);
+            const fid = {};
+            KEYS.forEach(k => {
+                const px = hyp[k][0] / sc, py = hyp[k][1] / sc;
+                const r = eng_refinePoint(grayFull, px, py, rad);
+                fid[k] = r ? [r.x, r.y] : [px, py];
+            });
+            let warped = null, lat = null;
+            try {
+                warped = eng_dualWarp(src, fid);
+                lat = eng_fitLattice(warped);
+            } catch (err) { if (warped) { warped.delete(); warped = null; } }
+            const conf = lat ? lat.conf : 0;
+            if (!best || conf > best.conf) {
+                if (best && best.warped) best.warped.delete();
+                best = { conf: conf, fid: fid, lat: lat, warped: warped, mode: hyp.mode };
+            } else if (warped) warped.delete();
+            if (best.conf >= 0.88) break;
+        }
+        small.delete(); graySmall.delete(); grayFull.delete();
+        if (best && best.warped) {
+            logAI(`${logPrefix} Fiducial: ${best.mode}, keteraturan kisi ${(best.conf * 100).toFixed(0)}%.`);
+        }
+        return best;
+    }
+
+    // Ekstraksi terpadu: dipakai oleh jalur kamera maupun unggah/PDF,
+    // sehingga keduanya menghasilkan pembacaan yang identik.
+    function eng_prepareGrid(warped) {
+        const lat = eng_fitLattice(warped);
+        const aff = eng_fitAffine(warped, lat);
+        const mask = eng_buildSampleMask(warped);
+        const grid = eng_buildGridData(mask, lat, aff);
+        engLastLattice = lat;
+        engLastAffine = aff;
+        engLastQuality = lat ? lat.conf : 0;
+        const fills = eng_collectLayoutFills(grid);
+        engFillThreshold = eng_gapThreshold(fills, eng_otsuThreshold(fills));
+        mask.delete();
+        return grid;
+    }
+
+    // shared_buildMetrics() — klasifikasi arsiran.
+    // Ambang memakai proporsi arsiran pada cakram PUSAT bubble. Nilai ini terbukti
+    // bimodal pada LJK nyata: bubble kosong berkumpul di ~0.20-0.40 (tinta huruf
+    // A/B/C/D yang tercetak di dalam bubble), bubble terarsir di ~0.85-1.00.
+    // Ambangnya sendiri ditentukan otomatis per lembar (Otsu) agar mengikuti
+    // ketebalan pensil, kualitas cetak, dan kondisi cahaya.
+    function shared_buildMetrics(opts, contextLabel = '') {
+        const T = engFillThreshold;
+        const outerFloor = Math.max(0.16, T * 0.45);
         const metrics = opts.map(opt => {
             const fillRatio = opt.area ? (opt.d / opt.area) : 0;
             const centerFillRatio = opt.centerArea ? (opt.centerDensity / opt.centerArea) : 0;
-            const combinedFillRatio = (centerFillRatio * centerWeight) + (fillRatio * outerWeight);
-            const signalRatio = opt.area > 0 ? (opt.d / Math.max(effectiveNoise, 1)) : 0;
-
-            let reason = REASON.MARKED;
-            let marked = true;
-            if (!(opt.area > 0)) { marked = false; reason = REASON.NO_AREA; }
-            else if (signalRatio < signalThreshold) { marked = false; reason = REASON.SIGNAL_LOW; }
-            else if (centerFillRatio < centerThreshold) { marked = false; reason = REASON.CENTER_LOW; }
-            else if (combinedFillRatio < combinedThreshold) { marked = false; reason = REASON.COMBINED_LOW; }
-
+            const combinedFillRatio = (centerFillRatio * 0.70) + (fillRatio * 0.30);
+            const signalRatio = centerFillRatio / Math.max(0.01, T);
+            let marked = true, reason = REASON.MARKED;
+            if (!(opt.area > 0 && opt.centerArea > 0)) { marked = false; reason = REASON.NO_AREA; }
+            else if (centerFillRatio < T) { marked = false; reason = REASON.CENTER_LOW; }
+            else if (fillRatio < outerFloor) { marked = false; reason = REASON.COMBINED_LOW; }
             return { ...opt, fillRatio, centerFillRatio, combinedFillRatio, signalRatio, marked, reason, source: currentScanSource };
         });
-
+        // Penyelamat arsiran SAMAR: bila tak ada satupun yang lolos ambang tegas,
+        // satu kandidat boleh diterima HANYA jika ia jauh lebih pekat daripada
+        // semua saingannya dan saingannya benar-benar bersih. Residu hapusan
+        // (yang nilainya berdekatan satu sama lain) tetap tertolak.
+        if (!metrics.some(m => m.marked)) {
+            const rank = metrics.filter(m => m.centerArea > 0)
+                                .sort((a, b) => b.centerFillRatio - a.centerFillRatio);
+            if (rank.length >= 2) {
+                const b0 = rank[0], b1 = rank[1];
+                if (b0.centerFillRatio >= ENG.FAINT_FLOOR
+                    && b0.centerFillRatio >= ENG.FAINT_DOMINANCE * b1.centerFillRatio
+                    && b1.centerFillRatio < ENG.FAINT_RIVAL_MAX) {
+                    b0.marked = true;
+                    b0.reason = REASON.MARKED_FAINT;
+                }
+            }
+        }
         recordDiagnostics(metrics, contextLabel);
         return metrics;
     }
@@ -1000,56 +1629,19 @@
 
     function shared_evaluateExclusiveChoice(opts, ctx, keyToken = null, contextLabel = '') {
         const metrics = shared_buildMetrics(opts, contextLabel);
-        const ranked = [...metrics].sort((a, b) => (b.combinedFillRatio - a.combinedFillRatio) || (b.signalRatio - a.signalRatio));
-        const best = ranked[0];
-        const second = ranked[1];
-        const isCameraScan = currentScanSource === 'camera';
-        const strictMarked = metrics.filter(opt =>
-            opt.signalRatio >= (getBubbleSignalRatio() * (isCameraScan ? 1.18 : 1.04))
-            && opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * (isCameraScan ? 1.22 : 1.12))
-            && (
-                opt.centerFillRatio >= (getBubbleCenterFillRatio() * (isCameraScan ? 1.04 : 0.94))
-                || opt.fillRatio >= (getBubbleMarkedFillRatio() * (isCameraScan ? 1.14 : 1.1))
-            )
-        );
-
-        const dominanceGap = Math.max(getBubbleSoftGapRatio() * (isCameraScan ? 2.6 : 1.85), isCameraScan ? 0.045 : 0.03);
-        const signalGap = isCameraScan ? 0.28 : 0.2;
-        const bestDominant = !!(best && second
-            && (best.combinedFillRatio - second.combinedFillRatio) >= dominanceGap
-            && (best.signalRatio - second.signalRatio) >= signalGap);
-        const bestStrongEnough = !!(best
-            && best.signalRatio >= (getBubbleSignalRatio() * (isCameraScan ? 1.02 : 0.95))
-            && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * (isCameraScan ? 1.08 : 1.02))
-            && (
-                best.centerFillRatio >= (getBubbleCenterFillRatio() * (isCameraScan ? 0.96 : 0.86))
-                || best.fillRatio >= (getBubbleMarkedFillRatio() * (isCameraScan ? 1.1 : 1.05))
-            ));
-
-        let selected = '-';
-        let drawOptions = [];
-
-        if (strictMarked.length === 1) {
-            if (!isCameraScan || bestStrongEnough) {
-                selected = strictMarked[0].v;
-                drawOptions = [strictMarked[0]];
+        const marked = metrics.filter(o => o.marked);
+        let selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
+        let draw = marked.length === 1 ? [marked[0]] : [];
+        if (marked.length > 1) {
+            const ranked = [...marked].sort((a, b) => b.centerFillRatio - a.centerFillRatio);
+            if ((ranked[0].centerFillRatio - ranked[1].centerFillRatio) >= 0.22) {
+                selected = ranked[0].v; draw = [ranked[0]];
             }
-        } else if (strictMarked.length > 1) {
-            if (bestStrongEnough && bestDominant) {
-                selected = best.v;
-                drawOptions = [best];
-            } else {
-                selected = '*';
-            }
-        } else if (bestStrongEnough && bestDominant) {
-            selected = best.v;
-            drawOptions = [best];
         }
-
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
-        if (drawOptions.length) {
+        if (draw.length) {
             const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
-            drawOptions.forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
+            draw.forEach(opt => shared_drawMarkedOption(ctx, opt, color, !keyToken));
         }
         return selected;
     }
@@ -1065,17 +1657,13 @@
         const marked = metrics.filter(opt => opt.marked);
 
         if (diagnosticModeEnabled) {
+            // Kandidat "nyaris terarsir" — hanya dicatat untuk diagnostik/kalibrasi,
+            // tidak pernah dihitung sebagai jawaban.
             const reviewCandidates = ranked.filter(opt => {
                 if (marked.some(mark => mark.v === opt.v)) return false;
                 if (opt.reason === REASON.NO_AREA) return false;
-                const signalEnough = opt.signalRatio >= (getBubbleSignalRatio() * 0.76);
-                const combinedEnough = opt.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.86);
-                const fillEnough = opt.centerFillRatio >= (getBubbleCenterFillRatio() * 0.7)
-                    || opt.fillRatio >= (getBubbleMarkedFillRatio() * 1.02);
-                const closeToBest = best
-                    ? (opt.combinedFillRatio >= (best.combinedFillRatio * 0.74) || opt.signalRatio >= (best.signalRatio * 0.74))
-                    : false;
-                return signalEnough && combinedEnough && fillEnough && closeToBest;
+                return opt.centerFillRatio >= (engFillThreshold * 0.70)
+                    && (!best || opt.centerFillRatio >= best.centerFillRatio * 0.60);
             }).map(opt => ({ ...opt, marked: false, reason: REASON.REVIEW }));
             recordDiagnostics(reviewCandidates, `${contextLabel}:review`);
         }
@@ -1114,7 +1702,9 @@
                 const designerCol = layout === 'V' ? Number(cfg.c) + idx : Number(cfg.c) + opt;
                 const designerRow = layout === 'V' ? Number(cfg.r) + opt : Number(cfg.r) + idx;
                 const cell = shared_getGridCell(grid, designerToGridRow(designerRow), designerToGridCol(designerCol));
-                opts.push({ v: labels[opt] || '', d: cell.density, area: cell.area, cx: cell.cx, cy: cell.cy });
+                opts.push({ v: labels[opt] || '', d: cell.density, area: cell.area,
+                            centerDensity: cell.centerDensity, centerArea: cell.centerArea,
+                            cx: cell.cx, cy: cell.cy });
             }
             const selected = shared_evaluateSingleChoice(opts, ctx, null, `IDENTITAS:${cfg.title || '-'}#${idx + 1}`);
             result.push(selected === '-' || selected === '*' ? ' ' : selected);
@@ -1416,49 +2006,23 @@
         currentScanSource = 'camera';
         resetDiagnostics();
         let ctx = resultCanvas.getContext('2d');
-        let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
-            cv.cvtColor(warpedMat, gray, cv.COLOR_RGBA2GRAY, 0);
-            cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-            cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 81, 18);
-            let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-            cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel); kernel.delete();
-
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
-            let threshSoft = new cv.Mat();
-            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 8);
-            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
-            cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
-            kernelSoft.delete();
-            let gridData = [];
-            for(let r = 0; r < gridRows; r++) {
-                gridData[r] = [];
-                for(let c = 0; c < gridCols; c++) {
-                    let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
-                    let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale()));
-                    let centerSize = Math.max(6, Math.floor(GRID_SIZE * getBubbleCenterSamplingScale()));
-                    let coreRect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
-                    let centerRect = new cv.Rect(Math.floor(cx - (centerSize / 2)), Math.floor(cy - (centerSize / 2)), centerSize, centerSize);
-                    let roiMain = thresh.roi(coreRect);
-                    let roiSoft = threshSoft.roi(coreRect);
-                    let roiCenterMain = thresh.roi(centerRect);
-                    let roiCenterSoft = threshSoft.roi(centerRect);
-                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.52) + (cv.countNonZero(roiSoft) * 0.48));
-                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.6) + (cv.countNonZero(roiCenterSoft) * 0.4));
-                    gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
-                    roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
+            // Mesin V2: kalibrasi kisi otomatis + pengukuran arsiran berbasis cakram.
+            const gridData = eng_prepareGrid(warpedMat);
+            if (engLastQuality < 0.25) return false;   // kisi tak terbaca -> minta rotasi/ulang
+
+            ctx.strokeStyle = "rgba(239, 68, 68, 0.18)"; ctx.lineWidth = 1;
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const cell = gridData[r][c];
+                    if (!cell || !cell.centerArea) continue;
+                    ctx.beginPath();
+                    ctx.arc(cell.cx, cell.cy, 2, 0, 2 * Math.PI);
+                    ctx.stroke();
                 }
             }
-            threshSoft.delete();
-
-            let testNameDensity = shared_probeIdentityDensity(gridData);
-            if (testNameDensity < 50) return false; 
-
-            ctx.strokeStyle = "rgba(239, 68, 68, 0.2)"; ctx.lineWidth = 1;
-            for(let r = 0; r <= gridRows; r++) { ctx.beginPath(); ctx.moveTo(START_X, START_Y + r * GRID_SIZE); ctx.lineTo(START_X + (gridCols * GRID_SIZE), START_Y + r * GRID_SIZE); ctx.stroke(); }
-            for(let c = 0; c <= gridCols; c++) { ctx.beginPath(); ctx.moveTo(START_X + c * GRID_SIZE, START_Y); ctx.lineTo(START_X + c * GRID_SIZE, START_Y + (gridRows * GRID_SIZE)); ctx.stroke(); }
 
             let name = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.nama, ALPHABET, ctx);
             let kelas = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.kelas, KELAS_VALS, ctx);
@@ -1487,39 +2051,48 @@
             
             return true; 
         } finally {
-            gray.delete(); thresh.delete();
+            /* mesin V2 mengelola Mat internalnya sendiri */
         }
     }
 
     function cam_processFullRes(canvas, fids) {
-        let src = null, finalWarpedMat = null; 
+        let src = null, finalWarpedMat = null;
         try {
             src = cv.imread(canvas);
-            logAI("[KAMERA] Ekstraksi resolusi tinggi dari frame stabil...");
-            finalWarpedMat = cam_performDualWarp(src, fids);
+            logAI("[KAMERA] Frame stabil ditangkap. Mengunci fiducial presisi...");
+            // Jalur kamera memakai mesin deteksi yang sama dengan unggahan,
+            // sehingga hasil pembacaan kamera dan unggahan konsisten.
+            const best = eng_detectAndWarp(src, "[KAMERA]");
+            if (best && best.warped && best.conf >= 0.35) {
+                finalWarpedMat = best.warped;
+            } else {
+                if (best && best.warped) best.warped.delete();
+                logAI("[KAMERA] Memakai titik hasil pelacakan langsung sebagai cadangan.");
+                finalWarpedMat = cam_performDualWarp(src, fids);
+            }
 
-            document.getElementById('result-canvas').width = getWarpWidth(); 
-            document.getElementById('result-canvas').height = getWarpHeight();
-            
+            document.getElementById('result-canvas').width = finalWarpedMat.cols;
+            document.getElementById('result-canvas').height = finalWarpedMat.rows;
             cv.imshow('result-canvas', finalWarpedMat);
-            document.getElementById('result-canvas').style.display = 'block'; 
+            document.getElementById('result-canvas').style.display = 'block';
             document.getElementById('result-canvas').classList.remove('hidden');
 
             let isSuccess = cam_performExtraction(finalWarpedMat);
             if (!isSuccess) {
-                logAI("[KAMERA] Data LJK terbalik. Memutar 180 derajat otomatis...");
+                logAI("[KAMERA] Kisi tidak terbaca. Mencoba rotasi 180 derajat...");
                 cv.rotate(finalWarpedMat, finalWarpedMat, cv.ROTATE_180);
                 cv.imshow('result-canvas', finalWarpedMat);
-                isSuccess = cam_performExtraction(finalWarpedMat); 
-                if (!isSuccess) throw new Error("Gagal mengekstrak isian LJK dari Kamera.");
+                isSuccess = cam_performExtraction(finalWarpedMat);
+                if (!isSuccess) throw new Error("Kisi bubble tidak dapat dikunci dari kamera. Pastikan keenam kotak hitam terlihat utuh.");
             }
+            logAI(`[KAMERA] Selesai. Ambang arsiran lembar ini: ${engFillThreshold.toFixed(2)}.`);
         } catch (err) {
-            logAI(err.message, true); showCustomAlert(err.message); 
-        } finally { 
-            if(src) src.delete(); 
-            if(finalWarpedMat) finalWarpedMat.delete(); 
+            logAI(err.message, true); showCustomAlert(err.message);
+        } finally {
+            if (src) src.delete();
+            if (finalWarpedMat) finalWarpedMat.delete();
             document.getElementById('loader-overlay').classList.add('hidden');
-            isProcessing = false; 
+            isProcessing = false;
         }
     }
 
@@ -1880,49 +2453,23 @@
         currentScanSource = 'upload';
         resetDiagnostics();
         let ctx = resultCanvas.getContext('2d');
-        let gray = new cv.Mat(), thresh = new cv.Mat();
         try {
-            cv.cvtColor(warpedMat, gray, cv.COLOR_RGBA2GRAY, 0);
-            cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-            cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 81, 18);
-            let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-            cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel); kernel.delete();
-
             const gridRows = getGridRowsCount();
             const gridCols = getGridColsCount();
-            let threshSoft = new cv.Mat();
-            cv.adaptiveThreshold(gray, threshSoft, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 51, 8);
-            let kernelSoft = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(2, 2));
-            cv.morphologyEx(threshSoft, threshSoft, cv.MORPH_OPEN, kernelSoft);
-            kernelSoft.delete();
-            let gridData = [];
-            for(let r = 0; r < gridRows; r++) {
-                gridData[r] = [];
-                for(let c = 0; c < gridCols; c++) {
-                    let cx = START_X + (c * GRID_SIZE) + (GRID_SIZE / 2);
-                    let cy = START_Y + (r * GRID_SIZE) + (GRID_SIZE / 2);
-                    let coreSize = Math.max(8, Math.floor(GRID_SIZE * getBubbleSamplingScale()));
-                    let centerSize = Math.max(6, Math.floor(GRID_SIZE * getBubbleCenterSamplingScale()));
-                    let coreRect = new cv.Rect(Math.floor(cx - (coreSize / 2)), Math.floor(cy - (coreSize / 2)), coreSize, coreSize);
-                    let centerRect = new cv.Rect(Math.floor(cx - (centerSize / 2)), Math.floor(cy - (centerSize / 2)), centerSize, centerSize);
-                    let roiMain = thresh.roi(coreRect);
-                    let roiSoft = threshSoft.roi(coreRect);
-                    let roiCenterMain = thresh.roi(centerRect);
-                    let roiCenterSoft = threshSoft.roi(centerRect);
-                    let outerDensity = Math.round((cv.countNonZero(roiMain) * 0.52) + (cv.countNonZero(roiSoft) * 0.48));
-                    let centerDensity = Math.round((cv.countNonZero(roiCenterMain) * 0.6) + (cv.countNonZero(roiCenterSoft) * 0.4));
-                    gridData[r][c] = { density: outerDensity, area: coreSize * coreSize, centerDensity: centerDensity, centerArea: centerSize * centerSize, cx: cx, cy: cy };
-                    roiMain.delete(); roiSoft.delete(); roiCenterMain.delete(); roiCenterSoft.delete();
+            // Mesin V2: kalibrasi kisi otomatis + pengukuran arsiran berbasis cakram.
+            const gridData = eng_prepareGrid(warpedMat);
+            if (engLastQuality < 0.25) return false;   // kisi tak terbaca -> minta rotasi/ulang
+
+            ctx.strokeStyle = "rgba(239, 68, 68, 0.18)"; ctx.lineWidth = 1;
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const cell = gridData[r][c];
+                    if (!cell || !cell.centerArea) continue;
+                    ctx.beginPath();
+                    ctx.arc(cell.cx, cell.cy, 2, 0, 2 * Math.PI);
+                    ctx.stroke();
                 }
             }
-            threshSoft.delete();
-
-            let testNameDensity = shared_probeIdentityDensity(gridData);
-            if (testNameDensity < 50) return false; 
-
-            ctx.strokeStyle = "rgba(239, 68, 68, 0.2)"; ctx.lineWidth = 1;
-            for(let r = 0; r <= gridRows; r++) { ctx.beginPath(); ctx.moveTo(START_X, START_Y + r * GRID_SIZE); ctx.lineTo(START_X + (gridCols * GRID_SIZE), START_Y + r * GRID_SIZE); ctx.stroke(); }
-            for(let c = 0; c <= gridCols; c++) { ctx.beginPath(); ctx.moveTo(START_X + c * GRID_SIZE, START_Y); ctx.lineTo(START_X + c * GRID_SIZE, START_Y + (gridRows * GRID_SIZE)); ctx.stroke(); }
 
             let name = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.nama, ALPHABET, ctx);
             let kelas = shared_extractIdentity(gridData, activeLayoutConfig.identitas?.kelas, KELAS_VALS, ctx);
@@ -1951,86 +2498,51 @@
             
             return true; 
         } finally {
-            gray.delete(); thresh.delete();
+            /* mesin V2 mengelola Mat internalnya sendiri */
         }
     }
 
     function runUploadPipeline(canvas, options = {}) {
-        let src = null, roughWarped = null, finalWarpedMat = null; 
+        let src = null, finalWarpedMat = null;
         const batchMode = !!options.batchMode;
-        let completed = false;
         try {
             src = cv.imread(canvas);
-            const prefix = batchMode ? `[PDF ${options.pageIndex}/${options.totalPages}]` : "[UPLOAD]";
-            logAI(`${prefix} Tahap 1: Multi-Strategy Contour Detection...`);
-            let paperPts = up_detectPaperRegion(src);
-            
-            if (!paperPts) {
-                logAI(`${prefix} Gagal deteksi kontur. Force Full Frame...`);
-                paperPts = [ {x:0,y:0}, {x:src.cols,y:0}, {x:src.cols,y:src.rows}, {x:0,y:src.rows} ];
-            }
-            
-            let w1 = shared_dist(paperPts[0], paperPts[1]);
-            let w2 = shared_dist(paperPts[2], paperPts[3]);
-            let h1 = shared_dist(paperPts[1], paperPts[2]);
-            let h2 = shared_dist(paperPts[3], paperPts[0]);
-            let avgW = (w1 + w2) / 2;
-            let avgH = (h1 + h2) / 2;
-            let ROUGH_W = 1200;
-            let ROUGH_H = Math.round(ROUGH_W * (avgH / avgW));
+            const prefix = batchMode ? `[PDF ${options.pageIndex}/${options.totalPages}]` : "[UNGGAH]";
+            logAI(`${prefix} Mencari 6 kotak fiducial (kebal rotasi 90/180 derajat)...`);
 
-            let srcMat = cv.matFromArray(4, 1, cv.CV_32FC2, [paperPts[0].x, paperPts[0].y, paperPts[1].x, paperPts[1].y, paperPts[2].x, paperPts[2].y, paperPts[3].x, paperPts[3].y]);
-            let dstMat = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, ROUGH_W, 0, ROUGH_W, ROUGH_H, 0, ROUGH_H]);
-            let M_rough = cv.getPerspectiveTransform(srcMat, dstMat);
-            
-            roughWarped = new cv.Mat();
-            cv.warpPerspective(src, roughWarped, M_rough, new cv.Size(ROUGH_W, ROUGH_H));
-            srcMat.delete(); dstMat.delete(); M_rough.delete();
-
-            logAI(`${prefix} Tahap 2: Filter Struktural Fiducial (Min X-Variance)...`);
-            let fid = up_find6FiducialsWithFallback(roughWarped);
-
-            let isFailedWarp = false;
-            if (fid) {
-                logAI(`${prefix} Tahap 3: Dynamic Split-Ratio Warp...`);
-                finalWarpedMat = up_performDualWarp(roughWarped, fid);
-            } else {
-                logAI(`${prefix} INFO: Fiducial gagal ditemukan.`, true);
-                finalWarpedMat = roughWarped.clone();
-                isFailedWarp = true;
-            }
-
-            document.getElementById('result-canvas').width = finalWarpedMat.cols; 
-            document.getElementById('result-canvas').height = finalWarpedMat.rows;
-            cv.imshow('result-canvas', finalWarpedMat);
-            document.getElementById('result-canvas').style.display = 'block'; 
-            document.getElementById('result-canvas').classList.remove('hidden');
-
-            if(isFailedWarp) {
-                if (!batchMode) showCustomAlert("Diagnostik Pemindaian:\nSistem gagal menemukan 6 titik kotak LJK secara selaras.\n\nGambar yang diluruskan secara kasar tetap ditampilkan pada layar agar Bapak dapat menganalisis letak distorsi atau bayangannya.");
+            const best = eng_detectAndWarp(src, prefix);
+            if (!best || !best.warped) {
+                logAI(`${prefix} Enam kotak fiducial tidak ditemukan.`, true);
+                if (!batchMode) showCustomAlert("Diagnostik Pemindaian:\nEnam kotak fiducial tidak dapat ditemukan pada gambar ini.\n\nPastikan seluruh bidang kertas ikut terfoto (keempat sudut dan kedua kotak tengah tidak terpotong) dan tidak tertutup bayangan pekat.");
                 return false;
             }
+            finalWarpedMat = best.warped;
+
+            document.getElementById('result-canvas').width = finalWarpedMat.cols;
+            document.getElementById('result-canvas').height = finalWarpedMat.rows;
+            cv.imshow('result-canvas', finalWarpedMat);
+            document.getElementById('result-canvas').style.display = 'block';
+            document.getElementById('result-canvas').classList.remove('hidden');
 
             let isSuccess = up_performExtraction(finalWarpedMat);
             if (!isSuccess) {
-                logAI(`${prefix} Ekstraksi kosong. Rotasi 180 derajat otomatis...`);
+                logAI(`${prefix} Kisi tidak terbaca. Mencoba rotasi 180 derajat...`);
                 cv.rotate(finalWarpedMat, finalWarpedMat, cv.ROTATE_180);
                 cv.imshow('result-canvas', finalWarpedMat);
-                isSuccess = up_performExtraction(finalWarpedMat); 
-                if (!isSuccess) {
-                    if (!batchMode) showCustomAlert("Diagnostik Pemindaian:\nIsian LJK tidak dapat diekstrak atau grid tidak selaras. Gambar telah dipertahankan di layar untuk analisis Bapak.");
+                isSuccess = up_performExtraction(finalWarpedMat);
+                if (!isSuccess && !batchMode) {
+                    showCustomAlert("Diagnostik Pemindaian:\nKisi bubble tidak dapat dikunci pada gambar ini. Gambar hasil pelurusan tetap ditampilkan agar dapat diperiksa.");
                 }
             }
-            completed = !!isSuccess;
-            return completed;
+            if (isSuccess) logAI(`${prefix} Selesai. Ambang arsiran lembar ini: ${engFillThreshold.toFixed(2)}.`);
+            return isSuccess;
         } catch (err) {
             logAI(err.message, true);
             if (!batchMode) showCustomAlert(err.message);
             return false;
-        } finally { 
-            if(src) src.delete(); 
-            if(roughWarped) roughWarped.delete();
-            if(finalWarpedMat) finalWarpedMat.delete(); 
+        } finally {
+            if (src) src.delete();
+            if (finalWarpedMat) finalWarpedMat.delete();
             if (!batchMode) {
                 document.getElementById('loader-overlay').classList.add('hidden');
                 isProcessing = false;
@@ -2431,7 +2943,10 @@
             if (checkbox) checkbox.checked = diagnosticModeEnabled;
             return diagnosticModeEnabled;
         },
-        getThresholdConfig: () => deepCopy(BUBBLE_THRESHOLD_BASE)
+        getThresholdConfig: () => deepCopy(BUBBLE_THRESHOLD_BASE),
+        getEngineState: () => ({ fillThreshold: engFillThreshold, gridQuality: engLastQuality,
+            lattice: engLastLattice ? { ...engLastLattice } : null,
+            affine: engLastAffine ? { cx: [...engLastAffine.cx], cy: [...engLastAffine.cy], n: engLastAffine.n } : null })
     };
 
     try {
