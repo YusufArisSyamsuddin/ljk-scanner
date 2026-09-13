@@ -397,37 +397,43 @@
         );
     }
     function getBubbleMarkedFillRatio() {
-        return clampFloatValue(
-            0.14 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003 + (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
-            0.14,
-            0.13,
-            0.2
-        );
+        return 0.18;
+        // return clampFloatValue(
+        //     0.14 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003 + (bubbleConfig.fontWeight >= 600 ? 0.008 : 0),
+        //     0.14,
+        //     0.13,
+        //     0.2
+        // );
     }
     function getBubbleSignalRatio() {
-        return clampFloatValue(2.45 + (bubbleConfig.fontWeight >= 600 ? 0.06 : 0), 2.45, 2.25, 3.1);
+        return 2.80;
+        // return clampFloatValue(2.45 + (bubbleConfig.fontWeight >= 600 ? 0.06 : 0), 2.45, 2.25, 3.1);
     }
     function getBubbleCenterSamplingScale() {
+        
         return clampFloatValue(getBubbleSamplingScale() * 0.64, 0.28, 0.24, 0.38);
     }
     function getBubbleCenterFillRatio() {
-        return clampFloatValue(
-            0.17 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.05 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
-            0.17,
-            0.14,
-            0.25
-        );
+        return 0.21;
+        // return clampFloatValue(
+        //     0.17 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.05 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+        //     0.17,
+        //     0.14,
+        //     0.25
+        // );
     }
     function getBubbleCombinedFillRatio() {
-        return clampFloatValue(
-            0.145 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
-            0.145,
-            0.13,
-            0.22
-        );
+        return 0.18;
+        // return clampFloatValue(
+        //     0.145 + Math.max(0, bubbleConfig.diameterRatio - 0.75) * 0.06 + Math.max(0, bubbleConfig.fontSize - 10) * 0.003,
+        //     0.145,
+        //     0.13,
+        //     0.22
+        // );
     }
     function getBubbleSoftGapRatio() {
-        return clampFloatValue(0.022 + (bubbleConfig.fontWeight >= 600 ? 0.004 : 0), 0.022, 0.018, 0.05);
+        return 0.035;
+        // return clampFloatValue(0.022 + (bubbleConfig.fontWeight >= 600 ? 0.004 : 0), 0.022, 0.018, 0.05);
     }
     function interpolateQuadPoint(quad, u, v) {
         const top = { x: quad.TL.x + ((quad.TR.x - quad.TL.x) * u), y: quad.TL.y + ((quad.TR.y - quad.TL.y) * u) };
@@ -896,17 +902,17 @@
         const best = ranked[0];
         const second = ranked[1];
         let selected = marked.length === 0 ? '-' : (marked.length === 1 ? marked[0].v : '*');
-        if (selected === '-' && best && second) {
-            const softEnough = best.signalRatio >= (getBubbleSignalRatio() * 0.82)
-                && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.9)
-                && (
-                    best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.74)
-                    || best.fillRatio >= (getBubbleMarkedFillRatio() * 1.02)
-                )
-                && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio()
-                && (best.signalRatio - second.signalRatio) >= 0.12;
-            if (softEnough) selected = best.v;
-        }
+        // if (selected === '-' && best && second) {
+        //     const softEnough = best.signalRatio >= (getBubbleSignalRatio() * 0.82)
+        //         && best.combinedFillRatio >= (getBubbleCombinedFillRatio() * 0.9)
+        //         && (
+        //             best.centerFillRatio >= (getBubbleCenterFillRatio() * 0.74)
+        //             || best.fillRatio >= (getBubbleMarkedFillRatio() * 1.02)
+        //         )
+        //         && (best.combinedFillRatio - second.combinedFillRatio) >= getBubbleSoftGapRatio()
+        //         && (best.signalRatio - second.signalRatio) >= 0.12;
+        //     if (softEnough) selected = best.v;
+        // }
         if (keyToken) shared_drawKeyMarkers(ctx, metrics, [keyToken]);
         if (marked.length || selected !== '-') {
             const color = keyToken ? (selected === keyToken ? '#10b981' : '#ef4444') : '#3b82f6';
