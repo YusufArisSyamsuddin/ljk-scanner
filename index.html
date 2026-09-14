@@ -55,6 +55,10 @@
                 <label id="lbl-answer-key" class="block text-xs font-bold mb-1 text-slate-700 uppercase">Panel Kunci Jawaban</label>
                 <p id="answer-key-summary" class="mb-3 text-[11px] font-medium leading-relaxed text-slate-500">Belum ada blok soal aktif pada desain.</p>
                 <div id="answer-key-panels" class="space-y-3 mb-1"></div>
+                <button id="btn-regrade" class="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wide py-2.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Terapkan Kunci &amp; Hitung Ulang Rekap
+                </button>
+                <p id="regrade-hint" class="mt-2 text-[10px] leading-relaxed text-slate-500"></p>
             </div>
         </div>
 
@@ -645,6 +649,26 @@
         const summary = document.getElementById('answer-key-summary');
         if (label) label.textContent = 'Panel Kunci Jawaban';
         if (summary) summary.textContent = total > 0 ? `Slot desain aktif: ${total} nomor. Kunci yang akan dinilai: ${active} nomor.` : 'Belum ada blok soal aktif pada desain.';
+        syncRegradeControls();
+    }
+
+    function syncRegradeControls() {
+        const button = document.getElementById('btn-regrade');
+        const hint = document.getElementById('regrade-hint');
+        const ready = countRegradableRows();
+        const stale = resultData.length - ready;
+        if (button) button.disabled = ready === 0;
+        if (hint) {
+            if (!resultData.length) {
+                hint.textContent = 'Rekap masih kosong. Setelah memindai, setiap perubahan kunci akan langsung menyesuaikan Jumlah Benar, Jumlah Salah, Nilai, Nomor Benar, Nomor Salah, dan Jawaban Terdeteksi tanpa perlu pindai ulang.';
+            } else if (ready && !stale) {
+                hint.textContent = `${ready} baris rekap siap dihitung ulang kapan saja. Ubah kunci di atas dan angkanya menyesuaikan sendiri — tidak perlu memindai ulang.`;
+            } else if (ready && stale) {
+                hint.textContent = `${ready} baris siap dihitung ulang; ${stale} baris berasal dari pemindaian versi lama dan perlu dipindai ulang sekali saja.`;
+            } else {
+                hint.textContent = 'Seluruh baris berasal dari pemindaian versi lama yang belum menyimpan data deteksi. Pindai ulang sekali saja, setelah itu perubahan kunci akan diikuti otomatis.';
+            }
+        }
     }
 
     function renderAnswerKeyInputs() {
@@ -680,6 +704,7 @@
                 answerKeyState[event.target.dataset.sectionId] = event.target.value.toUpperCase();
                 persistAnswerKeys();
                 updateAnswerKeyHeader();
+                scheduleRegrade();   // rekap mengikuti kunci secara langsung
             });
         });
         updateAnswerKeyHeader();
@@ -851,6 +876,24 @@
         return normalizeDisplayText(items);
     }
 
+    // Simpan hasil deteksi mentah agar rekap bisa dihitung ulang tanpa scan ulang.
+    function normalizeDetections(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const out = {};
+        let total = 0;
+        Object.keys(raw).forEach(sectionId => {
+            const bucket = raw[sectionId];
+            if (!bucket || typeof bucket !== 'object') return;
+            const clean = {};
+            Object.keys(bucket).forEach(num => {
+                const val = String(bucket[num] ?? '').toUpperCase().trim();
+                if (val) { clean[String(num)] = val; total++; }
+            });
+            if (Object.keys(clean).length) out[sectionId] = clean;
+        });
+        return total ? out : null;
+    }
+
     function normalizeStoredResultRow(row, index = 0) {
         if (!row || typeof row !== 'object') return null;
         const trueCount = Number(row.trueCount) || 0;
@@ -880,7 +923,8 @@
             sectionFalseCounts,
             answers: normalizeDisplayText(row.answers),
             correctNumbers: normalizeDisplayText(row.correctNumbers),
-            wrongNumbers: normalizeDisplayText(row.wrongNumbers)
+            wrongNumbers: normalizeDisplayText(row.wrongNumbers),
+            detections: normalizeDetections(row.detections)
         };
     }
 
@@ -1726,23 +1770,15 @@
         return density;
     }
 
-    function shared_gradeAnswers(grid, ctx, keyMap) {
-        const answers = [];
-        const correctNumbers = [];
-        const wrongNumbers = [];
-        const sectionTrueCounts = [];
-        const sectionFalseCounts = [];
-        let trueCount = 0, falseCount = 0, emptyCount = 0, questionCount = 0;
-
+    // Deteksi arsiran untuk SELURUH nomor soal, termasuk nomor yang belum punya
+    // kunci. Hasil mentah inilah yang disimpan bersama rekap, sehingga kunci dapat
+    // diubah kapan saja tanpa perlu memindai ulang lembar jawaban.
+    function shared_detectAllAnswers(grid, ctx, keyMap) {
+        const detections = {};
         getVisibleAnswerSections().forEach(section => {
             const sectionKeys = keyMap[section.id] || [];
-            const sectionAnswers = [];
-            const sectionCorrect = [];
-            const sectionWrong = [];
-            let sectionTrueCount = 0;
-            let sectionFalseCount = 0;
+            const bucket = {};
             section.questions.forEach((question, index) => {
-                if (index >= sectionKeys.length) return;
                 const opts = question.options.map(option => {
                     const cell = shared_getGridCell(grid, designerToGridRow(option.r), designerToGridCol(option.c));
                     return {
@@ -1755,45 +1791,67 @@
                         cy: cell.cy
                     };
                 });
+                const rawKey = index < sectionKeys.length ? (sectionKeys[index] || '') : '';
                 const keyToken = section.mode === 'multi'
-                    ? normalizeTokenForOrder(sectionKeys[index] || '', opts.map(opt => opt.v))
+                    ? normalizeTokenForOrder(rawKey, opts.map(opt => opt.v))
+                    : String(rawKey).toUpperCase().trim();
+                const contextLabel = `${section.short}#${question.number}`;
+                let detected = '-';
+                if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken || '', contextLabel);
+                else if (section.mode === 'binary_groups') detected = shared_evaluateBinaryGroups(opts, ctx, keyToken || '', contextLabel);
+                else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken || null, contextLabel);
+                else detected = shared_evaluateSingleChoice(opts, ctx, keyToken || null, contextLabel);
+                bucket[String(question.number)] = detected;
+            });
+            detections[section.id] = bucket;
+        });
+        return detections;
+    }
+
+    // Penilaian murni: hanya butuh hasil deteksi tersimpan + kunci saat ini.
+    // Tidak menyentuh gambar sama sekali, jadi bisa dipanggil ulang kapan pun.
+    function gradeFromDetections(detections, keyMap) {
+        const answers = [];
+        const correctNumbers = [];
+        const wrongNumbers = [];
+        const sectionTrueCounts = [];
+        const sectionFalseCounts = [];
+        let trueCount = 0, falseCount = 0, emptyCount = 0, questionCount = 0;
+
+        getVisibleAnswerSections().forEach(section => {
+            const sectionKeys = keyMap[section.id] || [];
+            const detMap = (detections && detections[section.id]) || {};
+            const sectionAnswers = [];
+            const sectionCorrect = [];
+            const sectionWrong = [];
+            let sectionTrueCount = 0;
+            let sectionFalseCount = 0;
+            section.questions.forEach((question, index) => {
+                if (index >= sectionKeys.length) return;
+                const keyToken = section.mode === 'multi'
+                    ? normalizeTokenForOrder(sectionKeys[index] || '', question.options.map(opt => String(opt.v).toUpperCase()))
                     : String(sectionKeys[index] || '').toUpperCase().trim();
                 if (!keyToken) return;
+                const detected = String(detMap[String(question.number)] ?? '-');
                 questionCount++;
-                let detected = '-';
-                const contextLabel = `${section.short}#${question.number}`;
-                if (section.mode === 'multi') detected = shared_evaluateMultiChoice(opts, ctx, keyToken, contextLabel);
-                else if (section.mode === 'binary_groups') detected = shared_evaluateBinaryGroups(opts, ctx, keyToken, contextLabel);
-                else if (section.mode === 'single_token') detected = shared_evaluateExclusiveChoice(opts, ctx, keyToken, contextLabel);
-                else detected = shared_evaluateSingleChoice(opts, ctx, keyToken, contextLabel);
                 sectionAnswers.push(`${question.number}-${detected}`);
                 if (section.mode === 'binary_groups') {
                     const emptyToken = '-'.repeat(Math.max(1, keyToken.length));
                     if (detected === emptyToken) {
                         emptyCount++;
                     } else if (detected === keyToken) {
-                        trueCount++;
-                        sectionTrueCount++;
-                        sectionCorrect.push(question.number);
+                        trueCount++; sectionTrueCount++; sectionCorrect.push(question.number);
                     } else {
-                        falseCount++;
-                        sectionFalseCount++;
-                        sectionWrong.push(question.number);
+                        falseCount++; sectionFalseCount++; sectionWrong.push(question.number);
                     }
                 } else if (section.mode === 'single_token' && detected === '*') {
-                    falseCount++;
-                    sectionFalseCount++;
-                    sectionWrong.push(question.number);
+                    falseCount++; sectionFalseCount++; sectionWrong.push(question.number);
                 } else if (detected === '-' || detected === '*') {
                     emptyCount++;
                 } else if (detected === keyToken) {
-                    trueCount++;
-                    sectionTrueCount++;
-                    sectionCorrect.push(question.number);
+                    trueCount++; sectionTrueCount++; sectionCorrect.push(question.number);
                 } else {
-                    falseCount++;
-                    sectionFalseCount++;
-                    sectionWrong.push(question.number);
+                    falseCount++; sectionFalseCount++; sectionWrong.push(question.number);
                 }
             });
             if (sectionAnswers.length) answers.push(`${section.short}: ${sectionAnswers.join(', ')}`);
@@ -1815,6 +1873,11 @@
             correctNumbers,
             wrongNumbers
         };
+    }
+
+    function shared_gradeAnswers(grid, ctx, keyMap) {
+        const detections = shared_detectAllAnswers(grid, ctx, keyMap);
+        return { ...gradeFromDetections(detections, keyMap), detections };
     }
 
     function cam_computeConfidence(fids) {
@@ -2752,6 +2815,62 @@
         });
     }
 
+    // Hitung ulang SELURUH baris rekap memakai kunci terbaru, tanpa scan ulang.
+    // Identitas (nomor peserta, nama, kelas, nomor urut) dipertahankan apa adanya,
+    // termasuk bila sudah diperbaiki manual oleh guru.
+    function regradeStoredResults(options = {}) {
+        const silent = !!options.silent;
+        if (!resultData.length) {
+            if (!silent) showCustomAlert("Tabel rekap masih kosong, belum ada yang bisa dihitung ulang.");
+            return { updated: 0, skipped: 0 };
+        }
+        const keyInfo = collectAnswerKeysForVisibleSections();
+        let updated = 0, skipped = 0;
+        resultData = resultData.map(row => {
+            if (!row.detections || !Object.keys(row.detections).length) { skipped++; return row; }
+            const score = gradeFromDetections(row.detections, keyInfo.keys);
+            updated++;
+            return normalizeStoredResultRow({
+                ...row,
+                ...score,
+                detections: row.detections,
+                recordId: row.recordId,
+                id: row.id,
+                name: row.name,
+                kelas: row.kelas,
+                peserta: row.peserta
+            });
+        });
+        updateTable();
+        if (!silent) {
+            if (updated && skipped) {
+                logAI(`[KUNCI] Rekap dihitung ulang: ${updated} baris diperbarui, ${skipped} baris dilewati (hasil pindai lama tanpa data deteksi).`);
+                showCustomAlert(`Rekap diperbarui mengikuti kunci terbaru.\n\n${updated} baris berhasil dihitung ulang.\n${skipped} baris berasal dari pemindaian versi lama sehingga tidak menyimpan data deteksi — baris tersebut perlu dipindai ulang sekali saja.`);
+            } else if (updated) {
+                logAI(`[KUNCI] Rekap dihitung ulang mengikuti kunci terbaru: ${updated} baris diperbarui.`);
+                showCustomAlert(`Rekap diperbarui mengikuti kunci terbaru.\n\n${updated} baris berhasil dihitung ulang tanpa perlu pindai ulang.`);
+            } else {
+                showCustomAlert("Tidak ada baris yang dapat dihitung ulang.\n\nSeluruh baris berasal dari pemindaian versi lama yang belum menyimpan data deteksi. Pindai ulang sekali saja, setelah itu perubahan kunci akan langsung diikuti otomatis.");
+            }
+        } else if (updated) {
+            logAI(`[KUNCI] Kunci berubah - ${updated} baris rekap ikut disesuaikan otomatis.`);
+        }
+        return { updated, skipped };
+    }
+
+    function countRegradableRows() {
+        return resultData.filter(row => row.detections && Object.keys(row.detections).length).length;
+    }
+
+    let regradeTimer = null;
+    function scheduleRegrade() {
+        if (regradeTimer) clearTimeout(regradeTimer);
+        regradeTimer = setTimeout(() => {
+            regradeTimer = null;
+            if (countRegradableRows()) regradeStoredResults({ silent: true });
+        }, 500);
+    }
+
     function updateTable() {
         let tbody = document.getElementById('result-table-body'); tbody.innerHTML = '';
         getSortedResultRows().forEach(d => {
@@ -2777,6 +2896,7 @@
         persistResults();
         updateSortHeaders();
         syncResultToolbar();
+        syncRegradeControls();
     }
 
     function syncResultToolbar() {
@@ -2913,6 +3033,10 @@
         openModal('result-modal');
     }
 
+    document.getElementById('btn-regrade').addEventListener('click', () => {
+        regradeStoredResults();
+    });
+
     document.getElementById('btn-export').addEventListener('click', () => {
         if (!resultData.length) return showCustomAlert("Belum ada hasil pemindaian untuk diekspor.");
         const ws = XLSX.utils.json_to_sheet(resultData.map(d => ({
@@ -2944,6 +3068,7 @@
             return diagnosticModeEnabled;
         },
         getThresholdConfig: () => deepCopy(BUBBLE_THRESHOLD_BASE),
+        regradeResults: (opts) => regradeStoredResults(opts || {}),
         getEngineState: () => ({ fillThreshold: engFillThreshold, gridQuality: engLastQuality,
             lattice: engLastLattice ? { ...engLastLattice } : null,
             affine: engLastAffine ? { cx: [...engLastAffine.cx], cy: [...engLastAffine.cy], n: engLastAffine.n } : null })
